@@ -370,12 +370,6 @@ ${documentContext}
 
     if (!contextFromInput && !contextFromPdf) return;
     
-    if (typeof process === 'undefined' || !process.env || !process.env.API_KEY) {
-        errorMessage.value = 'لم يتم العثور على مفتاح API.';
-        status.value = 'error';
-        return;
-    }
-    
     let userQuery, documentContext;
 
     if (contextFromPdf) {
