@@ -76,18 +76,23 @@ const downloadFile = (filename, content, mimeType) => {
 
 /**
  * Safely retrieves the API key from the environment.
- * @returns {string} The API key.
- * @throws {Error} If the API key is not found or process is not defined.
+ * @returns {string|null} The API key, or null if not found.
  */
 const getApiKey = () => {
-    // This function provides a safe way to access the API key,
-    // handling cases where 'process' is not defined in the environment.
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-        return process.env.API_KEY;
+    // This function provides a safe way to access the API key.
+    // In a real production environment, this would be handled by a secure backend
+    // or a build process that injects environment variables.
+    try {
+        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            return process.env.API_KEY;
+        }
+    } catch(e) {
+        // process is not defined in all environments
+        return null;
     }
-    // If we are here, the key is not configured correctly.
-    // Throw an error that will be caught by the calling function's try/catch block.
-    throw new Error('لم يتم العثور على مفتاح API. تأكد من تكوينه بشكل صحيح في بيئة التشغيل.');
+    // Return null if the key is not configured.
+    // Functions calling this are responsible for handling the null case.
+    return null;
 };
 
 
@@ -102,7 +107,7 @@ const pdfFileName = signal('');
 const flowchartSvg = signal('');
 const summaryData = signal(null); // Will hold { summary: string, steps: array }
 const tableOfContents = signal(null); // Will hold the extracted ToC array
-const status = signal('idle'); // 'idle' | 'parsing' | 'generating' | 'success' | 'error' | 'quota_error'
+const status = signal('idle'); // 'idle' | 'parsing' | 'generating' | 'success' | 'error'
 const loadingMessage = signal('');
 const errorMessage = signal('');
 const documentSource = signal(''); // Holds the definitive document source for all features
@@ -133,51 +138,59 @@ const APP_STATE_KEY = 'workflowAutomatorState';
 
 const SAMPLE_SVG_DATA = `<svg width="300" height="550" viewBox="0 0 300 550" xmlns="http://www.w3.org/2000/svg" font-family="'Tajawal', Tahoma, sans-serif">
     <defs>
-        <marker id="arrowhead-sample" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
             <polygon points="0 0, 10 3.5, 0 7" fill="#28a745"></polygon>
         </marker>
+        <filter id="dropShadow" height="130%">
+            <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.1)"></feDropShadow>
+        </filter>
+        <style>
+            .clickable-node { cursor: pointer; } 
+            g.clickable-node > rect { transition: stroke 0.2s ease, stroke-width 0.2s ease; } 
+            g.clickable-node:hover > rect { stroke-width: 3px; stroke: #218838; }
+        </style>
     </defs>
     <!-- Node 1 -->
-    <g>
-        <rect x="40" y="20" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
+    <g id="node-1" class="clickable-node" filter="url(#dropShadow)">
+        <rect x="40" y="20" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
         <foreignObject x="40" y="20" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
                 تقديم الطلب عبر النظام
             </div>
         </foreignObject>
         <text x="150" y="105" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
     </g>
     <!-- Arrow 1 -->
-    <path d="M 150 115 V 145" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
+    <path d="M 150 115 V 145" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead)"></path>
     <!-- Node 2 -->
-    <g>
-        <rect x="40" y="155" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
+    <g id="node-2" class="clickable-node" filter="url(#dropShadow)">
+        <rect x="40" y="155" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
         <foreignObject x="40" y="155" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
                 موافقة المدير المباشر
             </div>
         </foreignObject>
         <text x="150" y="240" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
     </g>
     <!-- Arrow 2 -->
-    <path d="M 150 250 V 280" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
+    <path d="M 150 250 V 280" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead)"></path>
     <!-- Node 3 -->
-    <g>
-        <rect x="40" y="290" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
+    <g id="node-3" class="clickable-node" filter="url(#dropShadow)">
+        <rect x="40" y="290" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
         <foreignObject x="40" y="290" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
                 اعتماد إدارة الموارد البشرية
             </div>
         </foreignObject>
         <text x="150" y="375" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
     </g>
     <!-- Arrow 3 -->
-    <path d="M 150 385 V 415" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
+    <path d="M 150 385 V 415" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead)"></path>
     <!-- Node 4 -->
-    <g>
-        <rect x="40" y="425" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
+    <g id="node-4" class="clickable-node" filter="url(#dropShadow)">
+        <rect x="40" y="425" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
         <foreignObject x="40" y="425" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
                 تأكيد نهائي وإشعار الموظف
             </div>
         </foreignObject>
@@ -185,8 +198,7 @@ const SAMPLE_SVG_DATA = `<svg width="300" height="550" viewBox="0 0 300 550" xml
     </g>
 </svg>`;
 
-const SAMPLE_DOCUMENT_TEXT = `
-[Source: Page 1]
+const SAMPLE_DOCUMENT_TEXT = `[Source: Page 1]
 **إجراء طلب إجازة سنوية**
 
 يهدف هذا الإجراء إلى توضيح الخطوات الرسمية لتقديم طلب إجازة سنوية للموظفين وضمان معالجته بكفاءة.
@@ -224,6 +236,79 @@ const TocComponent = ({ toc, onItemClick }) => {
     </div>
   `;
 };
+
+const handleClear = () => {
+    // Generation tab
+    userInput.value = '';
+    pdfText.value = '';
+    documentSource.value = '';
+    pdfFileName.value = '';
+    tableOfContents.value = null;
+    flowchartSvg.value = '';
+    errorMessage.value = '';
+    summaryData.value = null;
+    status.value = 'idle';
+    loadingMessage.value = '';
+    isListening.value = false;
+    // Q&A tab
+    qaStatus.value = 'idle';
+    topQuestions.value = [];
+    // Chat tab
+    chatHistory.value = [];
+    chatInput.value = '';
+    isChatting.value = false;
+    // Quiz tab
+    quizStatus.value = 'idle';
+    quizQuestions.value = [];
+    currentQuestionIndex.value = 0;
+    userAnswers.value = [];
+    quizError.value = '';
+    // Optimization tab
+    optimizationStatus.value = 'idle';
+    optimizationSuggestions.value = [];
+    // Clear saved state from localStorage
+    try {
+        localStorage.removeItem(APP_STATE_KEY);
+    } catch(e) {
+        console.warn("Could not remove state from localStorage", e);
+    }
+  };
+  
+const handleTrySample = () => {
+      handleClear();
+      status.value = 'generating';
+      loadingMessage.value = 'جاري تحميل المثال التوضيحي...';
+
+      // Simulate a small delay to make it feel like something is loading
+      setTimeout(() => {
+          userInput.value = ''; // Clear user input for sample
+          pdfText.value = SAMPLE_DOCUMENT_TEXT;
+          documentSource.value = SAMPLE_DOCUMENT_TEXT;
+          
+          summaryData.value = {
+              summary: "يهدف هذا الإجراء إلى توضيح الخطوات الرسمية لتقديم طلب إجازة سنوية للموظفين وضمان معالجته بكفاءة، بدءًا من تقديم الطلب عبر النظام، مرورًا بموافقة المدير المباشر، ثم اعتماد الموارد البشرية، وانتهاءً بتأكيد الطلب.",
+              steps: [
+                  { stepNumber: 1, description: "تقديم الطلب عبر النظام", page: 1 },
+                  { stepNumber: 2, description: "موافقة المدير المباشر", page: 1 },
+                  { stepNumber: 3, description: "اعتماد إدارة الموارد البشرية", page: 1 },
+                  { stepNumber: 4, description: "تأكيد نهائي وإشعار الموظف", page: 1 }
+              ]
+          };
+
+          flowchartSvg.value = SAMPLE_SVG_DATA;
+
+          topQuestions.value = [
+              { question: "كيف يقدم الموظف طلب الإجازة؟", answer: "يقوم الموظف بتسجيل الدخول إلى نظام الموارد البشرية الإلكتروني والتوجه إلى قسم 'الإجازات' لتعبئة طلب جديد." },
+              { question: "من الذي يوافق على الطلب أولاً؟", answer: "المدير المباشر هو أول من يراجع الطلب ويوافق عليه." },
+              { question: "ما هو دور إدارة الموارد البشرية في هذه العملية؟", answer: "تقوم بالتحقق النهائي من رصيد إجازات الموظف ومطابقة الطلب لسياسات الشركة قبل الاعتماد النهائي." },
+              { question: "كيف يعرف الموظف أن طلبه قد تمت الموافقة عليه؟", answer: "يتم إرسال بريد إلكتروني تلقائي للموظف لتأكيد الموافقة النهائية على إجازته." }
+          ];
+          
+          qaStatus.value = 'success';
+          status.value = 'success';
+          loadingMessage.value = '';
+      }, 500);
+  };
 
 // Main App Component
 const App = () => {
@@ -310,11 +395,15 @@ const App = () => {
     };
 
     const extractTextFromImage = async (file) => {
+        const apiKey = getApiKey();
+        if (!apiKey) {
+            throw new Error('فشل تحليل الصورة: لم يتم العثور على مفتاح API.');
+        }
         try {
             const imagePart = await fileToGenerativePart(file);
             const prompt = "استخرج كل النصوص الموجودة في هذه الصورة باللغة العربية. حافظ على التنسيق والفقرات قدر الإمكان.";
             
-            const ai = new GoogleGenAI({ apiKey: getApiKey() });
+            const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-preview-04-17',
                 contents: { parts: [imagePart, {text: prompt}] },
@@ -323,11 +412,6 @@ const App = () => {
     
             return response.text;
         } catch (e) {
-            // If the error is the specific API key error, rethrow it with a more user-friendly message for this context.
-            if (e instanceof Error && e.message.includes('لم يتم العثور على مفتاح API')) {
-                throw new Error('تحليل الصور (OCR) يتطلب مفتاح API. يرجى تحميل ملف PDF أو إدخال النص يدويًا.');
-            }
-            // For other errors (network, etc.)
             console.error("Image text extraction failed:", e);
             throw new Error('فشل في استخراج النص من الصورة.');
         }
@@ -335,6 +419,12 @@ const App = () => {
 
   const extractTocFromText = async (documentText) => {
     if (!documentText) return null;
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        console.warn("API Key not found, skipping ToC extraction.");
+        return null;
+    }
 
     const prompt = `
 أنت خبير في تحليل المستندات والتعرف على بنيتها، متخصص في المستندات العربية. مهمتك هي استخراج جدول المحتويات (ToC) من نص المستند المقدم.
@@ -352,7 +442,7 @@ ${documentText}
 ---
 قم بإنشاء مصفوفة JSON فقط. إذا لم يتم العثور على جدول محتويات، قم بإرجاع مصفوفة فارغة \`[]\`.`;
     try {
-        const ai = new GoogleGenAI({ apiKey: getApiKey() });
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-04-17',
             contents: prompt,
@@ -369,6 +459,12 @@ ${documentText}
   };
     
   const generateTopQuestions = async (documentContext, sectionContext) => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        console.warn("API Key not found, skipping QA generation.");
+        return [];
+    }
+
     const prompt = `أنت مساعد ذكاء اصطناعي متخصص في استخلاص المعلومات الأساسية من النصوص. مهمتك هي إنشاء قائمة بالأسئلة والأجوبة الأكثر أهمية بناءً على القسم المحدد من النص المقدم.
 
 **تعليمات صارمة:**
@@ -388,7 +484,7 @@ ${documentContext}
 ---
 الآن، قم بإنشاء مصفوفة JSON فقط بناءً على القسم المحدد.`;
 
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-preview-04-17',
         contents: prompt,
@@ -406,8 +502,12 @@ ${documentContext}
   const handleGenerate = async (sectionTitle = '') => {
     const contextFromInput = userInput.value.trim();
     const contextFromPdf = pdfText.value.trim();
-
-    if (!contextFromInput && !contextFromPdf) return;
+    
+    if (!contextFromInput && !contextFromPdf) {
+        errorMessage.value = "الرجاء إدخال نص أو تحميل ملف لتحليله.";
+        status.value = 'error';
+        return;
+    }
     
     let userQuery, documentContext;
 
@@ -422,6 +522,23 @@ ${documentContext}
     if (!documentContext) return;
     documentSource.value = documentContext; // Set the global source for other tabs
 
+    status.value = 'generating';
+    qaStatus.value = 'idle';
+    optimizationStatus.value = 'idle';
+    topQuestions.value = [];
+    flowchartSvg.value = '';
+    errorMessage.value = '';
+    summaryData.value = null;
+    optimizationSuggestions.value = [];
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        errorMessage.value = 'فشل التحليل: لم يتم العثور على مفتاح API. لتفعيل التحليل على مستنداتك الخاصة، يجب تكوين مفتاح API في بيئة التشغيل.';
+        status.value = 'error';
+        loadingMessage.value = '';
+        return;
+    }
+    
     const effectiveQuery = userQuery || "لخص العملية الرئيسية الموضحة في هذا المستند بالكامل.";
 
     const promptForAnalysis = `
@@ -505,20 +622,10 @@ ${documentContext}
 ${planStepsJson}
 ---
 الآن، قم بإنشاء كود SVG فقط، مع الالتزام الصارم بجميع تعليمات التصميم والجودة والتفاعل المحدّثة.`;
-
-
-    status.value = 'generating';
-    qaStatus.value = 'idle';
-    optimizationStatus.value = 'idle';
-    topQuestions.value = [];
-    flowchartSvg.value = '';
-    errorMessage.value = '';
-    summaryData.value = null;
-    optimizationSuggestions.value = [];
     
     try {
       loadingMessage.value = 'المرحلة الأولى: تحليل المستند...';
-      const ai = new GoogleGenAI({ apiKey: getApiKey() });
+      const ai = new GoogleGenAI({ apiKey });
 
       const analysisResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash-preview-04-17',
@@ -565,9 +672,9 @@ ${planStepsJson}
       console.error('Generation error:', err);
       qaStatus.value = 'error';
       if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
-        errorMessage.value = 'عذرًا، الخدمة تواجه ضغطًا. هذا مثال توضيحي للمخطط. يرجى المحاولة مرة أخرى لاحقًا.';
-        flowchartSvg.value = SAMPLE_SVG_DATA;
-        status.value = 'quota_error';
+        errorMessage.value = 'عذرًا، الخدمة تواجه ضغطًا. يرجى المحاولة مرة أخرى لاحقًا.';
+        flowchartSvg.value = ''; // Clear svg on quota error
+        status.value = 'error';
       } else {
         errorMessage.value = err instanceof Error ? `فشل التحليل: ${err.message}` : 'حدث خطأ غير متوقع.';
         status.value = 'error';
@@ -602,15 +709,17 @@ ${planStepsJson}
         pdfText.value = text;
         documentSource.value = text;
         
-        // Only try to extract ToC from PDFs
-        if (file.type === 'application/pdf') {
+        const apiKey = getApiKey();
+        // Only try to extract ToC if an API key exists
+        if (apiKey && file.type === 'application/pdf') {
             loadingMessage.value = 'جاري استخراج فهرس المحتويات...';
             tableOfContents.value = await extractTocFromText(text);
         } else {
-            tableOfContents.value = null; // No ToC for images
+            tableOfContents.value = null; // No ToC for images or if no API key
         }
         
         status.value = 'idle';
+        handleGenerate(); // Automatically start analysis after successful file processing
     } catch (err) {
         console.error('File processing error:', err);
         errorMessage.value = err instanceof Error ? err.message : 'فشل في معالجة الملف.';
@@ -629,78 +738,6 @@ ${planStepsJson}
     handleGenerate(item.title);
   };
     
-  const handleTrySample = () => {
-      handleClear();
-      status.value = 'generating';
-      loadingMessage.value = 'جاري تحميل المثال التوضيحي...';
-
-      // Simulate a small delay to make it feel like something is loading
-      setTimeout(() => {
-          userInput.value = SAMPLE_DOCUMENT_TEXT;
-          documentSource.value = SAMPLE_DOCUMENT_TEXT;
-          
-          summaryData.value = {
-              summary: "يهدف هذا الإجراء إلى توضيح الخطوات الرسمية لتقديم طلب إجازة سنوية للموظفين وضمان معالجته بكفاءة، بدءًا من تقديم الطلب عبر النظام، مرورًا بموافقة المدير المباشر، ثم اعتماد الموارد البشرية، وانتهاءً بتأكيد الطلب.",
-              steps: [
-                  { stepNumber: 1, description: "تقديم الطلب عبر النظام", page: 1 },
-                  { stepNumber: 2, description: "موافقة المدير المباشر", page: 1 },
-                  { stepNumber: 3, description: "اعتماد إدارة الموارد البشرية", page: 1 },
-                  { stepNumber: 4, description: "تأكيد نهائي وإشعار الموظف", page: 1 }
-              ]
-          };
-
-          flowchartSvg.value = SAMPLE_SVG_DATA;
-
-          topQuestions.value = [
-              { question: "كيف يقدم الموظف طلب الإجازة؟", answer: "يقوم الموظف بتسجيل الدخول إلى نظام الموارد البشرية الإلكتروني والتوجه إلى قسم 'الإجازات' لتعبئة طلب جديد." },
-              { question: "من الذي يوافق على الطلب أولاً؟", answer: "المدير المباشر هو أول من يراجع الطلب ويوافق عليه." },
-              { question: "ما هو دور إدارة الموارد البشرية في هذه العملية؟", answer: "تقوم بالتحقق النهائي من رصيد إجازات الموظف ومطابقة الطلب لسياسات الشركة قبل الاعتماد النهائي." },
-              { question: "كيف يعرف الموظف أن طلبه قد تمت الموافقة عليه؟", answer: "يتم إرسال بريد إلكتروني تلقائي للموظف لتأكيد الموافقة النهائية على إجازته." }
-          ];
-          
-          qaStatus.value = 'success';
-          status.value = 'success';
-          loadingMessage.value = '';
-      }, 500);
-  };
-
-  const handleClear = () => {
-    // Generation tab
-    userInput.value = '';
-    pdfText.value = '';
-    documentSource.value = '';
-    pdfFileName.value = '';
-    tableOfContents.value = null;
-    flowchartSvg.value = '';
-    errorMessage.value = '';
-    summaryData.value = null;
-    status.value = 'idle';
-    loadingMessage.value = '';
-    isListening.value = false;
-    // Q&A tab
-    qaStatus.value = 'idle';
-    topQuestions.value = [];
-    // Chat tab
-    chatHistory.value = [];
-    chatInput.value = '';
-    isChatting.value = false;
-    // Quiz tab
-    quizStatus.value = 'idle';
-    quizQuestions.value = [];
-    currentQuestionIndex.value = 0;
-    userAnswers.value = [];
-    quizError.value = '';
-    // Optimization tab
-    optimizationStatus.value = 'idle';
-    optimizationSuggestions.value = [];
-    // Clear saved state from localStorage
-    try {
-        localStorage.removeItem(APP_STATE_KEY);
-    } catch(e) {
-        console.warn("Could not remove state from localStorage", e);
-    }
-  };
-  
   const handleClearResults = () => {
     userInput.value = '';
     flowchartSvg.value = '';
@@ -722,6 +759,18 @@ ${planStepsJson}
     // Add placeholder for model's streaming response
     chatHistory.value = [...newHistory, { role: 'model', content: '' }];
 
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        const finalHistory = chatHistory.value;
+        const lastMessage = finalHistory[finalHistory.length - 1];
+        if (lastMessage && lastMessage.role === 'model') {
+            lastMessage.content = "ميزة الدردشة تتطلب مفتاح API للعمل على المستندات الخاصة. أنت حاليًا تتفاعل مع المثال التوضيحي.";
+            chatHistory.value = [...finalHistory];
+        }
+        isChatting.value = false;
+        return;
+    }
+
     // Check if this is a query from a flowchart node and reset the flag
     const nodeQuery = isNodeQuery.value;
     isNodeQuery.value = false;
@@ -732,7 +781,7 @@ ${planStepsJson}
     const systemInstruction = nodeQuery ? nodeQueryInstruction : defaultInstruction;
 
     try {
-        const ai = new GoogleGenAI({ apiKey: getApiKey() });
+        const ai = new GoogleGenAI({ apiKey });
         
         // Get history BEFORE the last user message for context
         const historyForChat = newHistory.slice(0, -1).map(msg => ({
@@ -964,8 +1013,6 @@ const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, 
       case 'parsing':
       case 'generating':
         return html`<div class="loader-container"><div class="loader"></div><p class="loading-text">${loadingMessage.value}</p></div>`;
-      case 'quota_error':
-        return html`<${Fragment}><div class="error info">${errorMessage.value}</div><div class="image-container" onClick=${handleChartClick} dangerouslySetInnerHTML=${{ __html: flowchartSvg.value }}></div></${Fragment}>`;
       case 'error':
         return html`<div class="error">${errorMessage.value}</div>`;
       case 'success':
@@ -979,7 +1026,12 @@ const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, 
             </div>
         </${Fragment}>`;
       default:
-        return null;
+         return html`
+            <div class="disabled-view">
+                <h3>مرحبًا بك!</h3>
+                <p>أنت الآن تتصفح مثالاً توضيحيًا تفاعليًا. لتحليل مستنداتك الخاصة، استبدل المحتوى الحالي بالنص أو الملف الذي تريده ثم انقر "إنشاء".</p>
+            </div>
+        `;
     }
   };
   
@@ -1019,12 +1071,25 @@ const QAView = () => {
         const jsonContent = JSON.stringify(topQuestions.value, null, 2);
         downloadFile('questions_and_answers.json', jsonContent, 'application/json;charset=utf-8');
     };
+    
+    const apiKey = getApiKey();
+    const hasSource = !!documentSource.value;
 
-    if (!documentSource.value) {
+    if (!hasSource) {
         return html`
             <div class="disabled-view">
                 <h3>أهم الأسئلة والأجوبة</h3>
-                <p>يرجى تحليل مستند أو قسم في تبويب "تحليل وإنشاء" أولاً لعرض الأسئلة والأجوبة المتعلقة به.</p>
+                <p>يرجى تحليل مستند في تبويب "تحليل وإنشاء" أولاً لعرض الأسئلة والأجوبة المتعلقة به.</p>
+            </div>
+        `;
+    }
+    
+    if (!apiKey && hasSource && topQuestions.value.length === 0) {
+        return html`
+            <div class="disabled-view">
+                <h3>أهم الأسئلة والأجوبة</h3>
+                <p>هذه الميزة تتطلب مفتاح API. يرجى تكوين مفتاح API لتوليد الأسئلة من مستندك.</p>
+                <p style=${{marginTop:'1rem', fontSize:'0.9rem'}}>أنت الآن ترى النتائج الخاصة بالمثال التوضيحي.</p>
             </div>
         `;
     }
@@ -1097,6 +1162,11 @@ const ChatView = ({ onSendMessage }) => {
     return html`
         <div class="chat-view">
             <div class="chat-history">
+                 ${chatHistory.value.length === 0 && html`
+                    <div class="disabled-view" style=${{height:'auto', minHeight:'auto', border: 'none', boxShadow: 'none'}}>
+                        <p>ابدأ الدردشة بطرح سؤال حول المستند الذي تم تحليله.</p>
+                    </div>
+                `}
                 ${chatHistory.value.map(msg => html`
                     <div class="chat-message ${msg.role}">
                         <div class="message-content" dangerouslySetInnerHTML=${{ __html: msg.content.replace(/\n/g, '<br />') }}></div>
@@ -1130,11 +1200,19 @@ const ChatView = ({ onSendMessage }) => {
 };
 
 const QuizView = () => {
+    const apiKey = getApiKey();
 
     const handleStartQuiz = async () => {
         if (!documentSource.value) return;
+        
         quizStatus.value = 'generating';
         quizError.value = '';
+
+        if (!apiKey) {
+            quizError.value = "ميزة الاختبار تتطلب مفتاح API. يرجى تكوين مفتاح API لبدء اختبار على مستندك.";
+            quizStatus.value = 'error';
+            return;
+        }
         
         const prompt = `You are an AI assistant tasked with creating a quiz.
 **TASK:** Based *only* on the provided document text, generate an array of 10 multiple-choice questions.
@@ -1151,7 +1229,7 @@ ${documentSource.value}
 Generate ONLY the JSON array.`;
 
         try {
-            const ai = new GoogleGenAI({ apiKey: getApiKey() });
+            const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-preview-04-17',
                 contents: prompt,
@@ -1312,10 +1390,16 @@ Generate ONLY the JSON array.`;
 };
 
 const OptimizationView = () => {
+    const apiKey = getApiKey();
 
     const handleGenerateOptimizations = async () => {
         optimizationStatus.value = 'generating';
         optimizationSuggestions.value = [];
+
+        if (!apiKey) {
+            optimizationStatus.value = 'error';
+            return;
+        }
 
         const prompt = `
 أنت مستشار خبير في تحسين العمليات الإدارية (Business Process Optimization). مهمتك هي تحليل الإجراء الموصوف وتقديم اقتراحات ملموسة لتحسينه.
@@ -1341,7 +1425,7 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
 الآن، قم بإنشاء مصفوفة JSON فقط تحتوي على اقتراحات التحسين باللغة العربية.`;
         
         try {
-            const ai = new GoogleGenAI({ apiKey: getApiKey() });
+            const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-preview-04-17',
                 contents: prompt,
@@ -1385,7 +1469,7 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
     if (optimizationStatus.value === 'error') {
         return html`
             <div class="optimization-view">
-                <div class="error">عذرًا، فشل في إنشاء اقتراحات التحسين.</div>
+                <div class="error">عذرًا، فشل في إنشاء اقتراحات التحسين. هذه الميزة تتطلب مفتاح API.</div>
                 <button onClick=${handleGenerateOptimizations} style=${{marginTop: '1rem'}}>حاول مجددًا</button>
             </div>
         `;
@@ -1470,10 +1554,22 @@ const loadStateFromLocalStorage = () => {
 const initializeApp = () => {
     loadStateFromLocalStorage();
 
+    // If, after loading state, there is no source document (i.e., new user or cleared state),
+    // then load the sample data to present a fully interactive initial state.
+    if (!documentSource.value) {
+        handleTrySample();
+    }
+
     // Effect to auto-save state to localStorage whenever a relevant signal changes
     effect(() => {
         // Apply theme class to body
         document.body.className = theme.value === 'dark' ? 'dark-theme' : '';
+        
+        // Don't save state if an API key error just occurred for a user action,
+        // as this prevents overwriting good state with an error state.
+        if (status.value === 'error' && errorMessage.value.includes('مفتاح API')) {
+            return;
+        }
 
         try {
             const stateToSave = {
