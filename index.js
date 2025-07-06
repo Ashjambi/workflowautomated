@@ -75,7 +75,8 @@ const downloadFile = (filename, content, mimeType) => {
 };
 
 // === Global Signals ===
-const activeTab = signal('generate'); // 'generate' | 'qa' | 'chat' | 'quiz'
+const activeTab = signal('generate'); // 'generate' | 'qa' | 'chat' | 'quiz' | 'optimize'
+const theme = signal('light'); // 'light' | 'dark'
 
 // --- Generation Tab Signals ---
 const userInput = signal('');
@@ -106,6 +107,10 @@ const quizQuestions = signal([]);
 const currentQuestionIndex = signal(0);
 const userAnswers = signal([]);
 const quizError = signal('');
+
+// --- Optimization Tab Signals ---
+const optimizationStatus = signal('idle'); // 'idle' | 'generating' | 'success' | 'error'
+const optimizationSuggestions = signal([]);
 
 const APP_STATE_KEY = 'workflowAutomatorState';
 
@@ -449,10 +454,12 @@ ${planStepsJson}
 
     status.value = 'generating';
     qaStatus.value = 'idle';
+    optimizationStatus.value = 'idle';
     topQuestions.value = [];
     flowchartSvg.value = '';
     errorMessage.value = '';
     summaryData.value = null;
+    optimizationSuggestions.value = [];
     
     try {
       loadingMessage.value = 'المرحلة الأولى: تحليل المستند...';
@@ -593,6 +600,9 @@ ${planStepsJson}
     currentQuestionIndex.value = 0;
     userAnswers.value = [];
     quizError.value = '';
+    // Optimization tab
+    optimizationStatus.value = 'idle';
+    optimizationSuggestions.value = [];
     // Clear saved state from localStorage
     try {
         localStorage.removeItem(APP_STATE_KEY);
@@ -731,9 +741,12 @@ ${planStepsJson}
   return html`
     <div class="app-content">
       <header>
-        <svg class="logo" width="140" height="70" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg">
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" class="logo-text">SGS</text>
-        </svg>
+        <div class="header-main">
+            <svg class="logo" width="140" height="70" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg">
+                <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" class="logo-text">SGS</text>
+            </svg>
+            <${ThemeToggleButton} />
+        </div>
         <div class="header-text">
             <h1>تحليل وتصميم خرائط العمليات آليًا</h1>
             <p>
@@ -747,6 +760,12 @@ ${planStepsJson}
           class="tab-button ${activeTab.value === 'generate' ? 'active' : ''}" 
           onClick=${() => activeTab.value = 'generate'}>
           تحليل وإنشاء
+        </button>
+        <button 
+          class="tab-button ${activeTab.value === 'optimize' ? 'active' : ''}" 
+          onClick=${() => activeTab.value = 'optimize'}
+          disabled=${status.value !== 'success'}>
+          تحسين الإجراء
         </button>
         <button 
           class="tab-button ${activeTab.value === 'qa' ? 'active' : ''}" 
@@ -775,6 +794,7 @@ ${planStepsJson}
             onChartNodeClick=${startChatWithNode}
             handleMicClick=${handleMicClick}
           />`}
+        ${activeTab.value === 'optimize' && html`<${OptimizationView} />`}
         ${activeTab.value === 'qa' && html`<${QAView} />`}
         ${activeTab.value === 'chat' && html`<${ChatView}
             onSendMessage=${handleSendMessage}
@@ -786,6 +806,24 @@ ${planStepsJson}
 };
 
 // --- Child Components ---
+
+const ThemeToggleButton = () => {
+    const isDark = theme.value === 'dark';
+
+    const toggleTheme = () => {
+        theme.value = isDark ? 'light' : 'dark';
+    };
+
+    const icon = isDark ? 
+        html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>` : 
+        html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+
+    return html`
+        <button class="theme-toggle" onClick=${toggleTheme} title=${`التبديل إلى الوضع ${isDark ? 'النهاري' : 'الليلي'}`}>
+            ${icon}
+        </button>
+    `;
+}
 
 const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, handleTocClick, onChartNodeClick, handleTrySample, handleMicClick }) => {
   const isGenerating = ['parsing', 'generating'].includes(status.value);
@@ -1182,12 +1220,128 @@ Generate ONLY the JSON array.`;
     `;
 };
 
+const OptimizationView = () => {
+
+    const handleGenerateOptimizations = async () => {
+        optimizationStatus.value = 'generating';
+        optimizationSuggestions.value = [];
+
+        const prompt = `
+أنت مستشار خبير في تحسين العمليات الإدارية (Business Process Optimization). مهمتك هي تحليل الإجراء الموصوف وتقديم اقتراحات ملموسة لتحسينه.
+
+**التعليمات الحاسمة:**
+1.  قم بتحليل النص المصدر الكامل وخطوات العملية المستخلصة منه.
+2.  حدد نقاط الضعف المحتملة، مثل:
+    *   **نقاط الاختناق (Bottlenecks):** خطوات قد تسبب تأخيرًا.
+    *   **الخطوات اليدوية (Manual Steps):** مهام يمكن أتمتتها.
+    *   **الخطوات الزائدة عن الحاجة (Redundancies):** تكرار لا لزوم له.
+    *   **فرص الدمج (Consolidation):** خطوات يمكن دمجها لزيادة الكفاءة.
+3.  قم بإنشاء قائمة من 3 إلى 5 اقتراحات عملية وقابلة للتنفيذ.
+4.  المخرج النهائي **يجب** أن يكون مصفوفة JSON صالحة فقط، باللغة العربية. لا تقم بتضمين أي نص أو شروحات أو علامات markdown.
+5.  يجب أن يتبع كل كائن في المصفوفة هذا الهيكل بالضبط: \`{ "title": "عنوان الاقتراح", "suggestion": "شرح مفصل للاقتراح وكيفية تطبيقه." }\`.
+
+---
+**النص المصدر الكامل (للسياق):**
+${documentSource.value}
+
+**خطوات العملية المستخلصة:**
+${JSON.stringify(summaryData.value?.steps, null, 2)}
+---
+الآن، قم بإنشاء مصفوفة JSON فقط تحتوي على اقتراحات التحسين باللغة العربية.`;
+        
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-04-17',
+                contents: prompt,
+                config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
+            });
+            const jsonText = extractJsonFromText(response.text);
+            const suggestions = JSON.parse(jsonText);
+            
+            if (!Array.isArray(suggestions) || suggestions.length === 0) {
+                throw new Error("لم يتم إنشاء اقتراحات صالحة.");
+            }
+            optimizationSuggestions.value = suggestions;
+            optimizationStatus.value = 'success';
+
+        } catch (e) {
+            console.error("Optimization generation error:", e);
+            optimizationStatus.value = 'error';
+        }
+    };
+    
+    if (status.value !== 'success') {
+        return html`
+            <div class="disabled-view">
+                <h3>تحسين الإجراء</h3>
+                <p>يرجى تحليل مستند بنجاح في تبويب "تحليل وإنشاء" أولاً لتفعيل هذه الميزة.</p>
+            </div>
+        `;
+    }
+
+    if (optimizationStatus.value === 'generating') {
+        return html`
+            <div class="optimization-view">
+                 <div class="loader-container">
+                    <div class="loader"></div>
+                    <p class="loading-text">جاري تحليل الإجراء وابتكار حلول تحسينية...</p>
+                </div>
+            </div>
+        `;
+    }
+
+    if (optimizationStatus.value === 'error') {
+        return html`
+            <div class="optimization-view">
+                <div class="error">عذرًا، فشل في إنشاء اقتراحات التحسين.</div>
+                <button onClick=${handleGenerateOptimizations} style=${{marginTop: '1rem'}}>حاول مجددًا</button>
+            </div>
+        `;
+    }
+    
+    if (optimizationStatus.value === 'success') {
+        return html`
+            <div class="optimization-view" style=${{textAlign: 'right'}}>
+                <h3>اقتراحات لتحسين الإجراء</h3>
+                <p style=${{textAlign: 'center'}}>بناءً على التحليل، إليك بعض الاقتراحات التي قد تساهم في زيادة كفاءة سير العمل.</p>
+                <div class="optimization-list">
+                    ${optimizationSuggestions.value.map(item => html`
+                        <div class="optimization-item">
+                            <h4 class="optimization-title">${item.title}</h4>
+                            <p class="optimization-suggestion">${item.suggestion}</p>
+                        </div>
+                    `)}
+                </div>
+                <div class="export-container">
+                    <button onClick=${handleGenerateOptimizations} class="clear-btn">إعادة إنشاء الاقتراحات</button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Default 'idle' state
+    return html`
+        <div class="optimization-view">
+            <h3>تحسين الإجراءات بواسطة الذكاء الاصطناعي</h3>
+            <p>هل تريد أن يصبح هذا الإجراء أفضل؟ انقر أدناه ليقوم الذكاء الاصطناعي بدور استشاري ويقترح عليك طرقًا لتحسين سير العمل وتحديد نقاط الضعف وفرص الأتمتة.</p>
+            <button onClick=${handleGenerateOptimizations}>تحليل واقتراح تحسينات</button>
+        </div>
+    `;
+};
+
 
 const loadStateFromLocalStorage = () => {
     try {
         const savedStateJSON = localStorage.getItem(APP_STATE_KEY);
         if (savedStateJSON) {
             const savedState = JSON.parse(savedStateJSON);
+            
+            // Set theme first as it affects rendering
+            const savedTheme = savedState.theme || 'light';
+            theme.value = savedTheme;
+            document.body.className = savedTheme === 'dark' ? 'dark-theme' : '';
+            
             activeTab.value = savedState.activeTab ?? 'generate';
             userInput.value = savedState.userInput ?? '';
             pdfText.value = savedState.pdfText ?? '';
@@ -1199,6 +1353,7 @@ const loadStateFromLocalStorage = () => {
             topQuestions.value = savedState.topQuestions ?? [];
             chatHistory.value = savedState.chatHistory ?? [];
             quizQuestions.value = savedState.quizQuestions ?? [];
+            optimizationSuggestions.value = savedState.optimizationSuggestions ?? [];
 
             // Set statuses based on loaded data
             if (documentSource.value) {
@@ -1210,6 +1365,9 @@ const loadStateFromLocalStorage = () => {
                 
                 if (quizQuestions.value.length > 0) quizStatus.value = 'idle';
                 else quizStatus.value = 'idle';
+
+                if (optimizationSuggestions.value.length > 0) optimizationStatus.value = 'success';
+                else optimizationStatus.value = 'idle';
             }
         }
     } catch (e) {
@@ -1223,8 +1381,12 @@ const initializeApp = () => {
 
     // Effect to auto-save state to localStorage whenever a relevant signal changes
     effect(() => {
+        // Apply theme class to body
+        document.body.className = theme.value === 'dark' ? 'dark-theme' : '';
+
         try {
             const stateToSave = {
+                theme: theme.value,
                 activeTab: activeTab.value,
                 userInput: userInput.value,
                 pdfText: pdfText.value,
@@ -1236,6 +1398,7 @@ const initializeApp = () => {
                 topQuestions: topQuestions.value,
                 chatHistory: chatHistory.value,
                 quizQuestions: quizQuestions.value,
+                optimizationSuggestions: optimizationSuggestions.value,
             };
             localStorage.setItem(APP_STATE_KEY, JSON.stringify(stateToSave));
         } catch (e) {
