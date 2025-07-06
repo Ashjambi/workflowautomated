@@ -74,6 +74,23 @@ const downloadFile = (filename, content, mimeType) => {
     URL.revokeObjectURL(url);
 };
 
+/**
+ * Safely retrieves the API key from the environment.
+ * @returns {string} The API key.
+ * @throws {Error} If the API key is not found or process is not defined.
+ */
+const getApiKey = () => {
+    // This function provides a safe way to access the API key,
+    // handling cases where 'process' is not defined in the environment.
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+        return process.env.API_KEY;
+    }
+    // If we are here, the key is not configured correctly.
+    // Throw an error that will be caught by the calling function's try/catch block.
+    throw new Error('لم يتم العثور على مفتاح API. تأكد من تكوينه بشكل صحيح في بيئة التشغيل.');
+};
+
+
 // === Global Signals ===
 const activeTab = signal('generate'); // 'generate' | 'qa' | 'chat' | 'quiz' | 'optimize'
 const theme = signal('light'); // 'light' | 'dark'
@@ -284,7 +301,7 @@ const App = () => {
         const imagePart = await fileToGenerativePart(file);
         const prompt = "استخرج كل النصوص الموجودة في هذه الصورة باللغة العربية. حافظ على التنسيق والفقرات قدر الإمكان.";
         
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-04-17',
             contents: { parts: [imagePart, {text: prompt}] },
@@ -313,7 +330,7 @@ ${documentText}
 ---
 قم بإنشاء مصفوفة JSON فقط. إذا لم يتم العثور على جدول محتويات، قم بإرجاع مصفوفة فارغة \`[]\`.`;
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-04-17',
             contents: prompt,
@@ -349,7 +366,7 @@ ${documentContext}
 ---
 الآن، قم بإنشاء مصفوفة JSON فقط بناءً على القسم المحدد.`;
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-preview-04-17',
         contents: prompt,
@@ -457,7 +474,7 @@ ${planStepsJson}
     
     try {
       loadingMessage.value = 'المرحلة الأولى: تحليل المستند...';
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
       const analysisResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash-preview-04-17',
@@ -636,7 +653,7 @@ ${planStepsJson}
     const systemInstruction = nodeQuery ? nodeQueryInstruction : defaultInstruction;
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         
         // Get history BEFORE the last user message for context
         const historyForChat = newHistory.slice(0, -1).map(msg => ({
@@ -1054,7 +1071,7 @@ ${documentSource.value}
 Generate ONLY the JSON array.`;
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: getApiKey() });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-preview-04-17',
                 contents: prompt,
@@ -1244,7 +1261,7 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
 الآن، قم بإنشاء مصفوفة JSON فقط تحتوي على اقتراحات التحسين باللغة العربية.`;
         
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: getApiKey() });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-preview-04-17',
                 contents: prompt,
