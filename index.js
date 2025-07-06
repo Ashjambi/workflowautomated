@@ -131,7 +131,7 @@ const optimizationSuggestions = signal([]);
 
 const APP_STATE_KEY = 'workflowAutomatorState';
 
-const SAMPLE_SVG_DATA = `<svg width="300" height="480" viewBox="0 0 300 480" xmlns="http://www.w3.org/2000/svg" font-family="'Tajawal', Tahoma, sans-serif">
+const SAMPLE_SVG_DATA = `<svg width="300" height="550" viewBox="0 0 300 550" xmlns="http://www.w3.org/2000/svg" font-family="'Tajawal', Tahoma, sans-serif">
     <defs>
         <marker id="arrowhead-sample" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
             <polygon points="0 0, 10 3.5, 0 7" fill="#28a745"></polygon>
@@ -142,34 +142,46 @@ const SAMPLE_SVG_DATA = `<svg width="300" height="480" viewBox="0 0 300 480" xml
         <rect x="40" y="20" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
         <foreignObject x="40" y="20" width="220" height="70">
             <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
-                الخطوة الأولى: تحديد المتطلبات
+                تقديم الطلب عبر النظام
             </div>
         </foreignObject>
-        <text x="150" y="110" font-size="12px" fill="#6c757d" text-anchor="middle">(مثال توضيحي)</text>
+        <text x="150" y="105" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
     </g>
     <!-- Arrow 1 -->
-    <path d="M 150 125 V 155" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
+    <path d="M 150 115 V 145" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
     <!-- Node 2 -->
     <g>
-        <rect x="40" y="165" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
-        <foreignObject x="40" y="165" width="220" height="70">
+        <rect x="40" y="155" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
+        <foreignObject x="40" y="155" width="220" height="70">
             <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
-                الخطوة الثانية: التصميم والتخطيط
+                موافقة المدير المباشر
             </div>
         </foreignObject>
-        <text x="150" y="255" font-size="12px" fill="#6c757d" text-anchor="middle">(مثال توضيحي)</text>
+        <text x="150" y="240" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
     </g>
     <!-- Arrow 2 -->
-    <path d="M 150 270 V 300" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
+    <path d="M 150 250 V 280" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
     <!-- Node 3 -->
     <g>
-        <rect x="40" y="310" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
-        <foreignObject x="40" y="310" width="220" height="70">
+        <rect x="40" y="290" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
+        <foreignObject x="40" y="290" width="220" height="70">
             <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
-                الخطوة الثالثة: التنفيذ والنشر
+                اعتماد إدارة الموارد البشرية
             </div>
         </foreignObject>
-        <text x="150" y="400" font-size="12px" fill="#6c757d" text-anchor="middle">(مثال توضيحي)</text>
+        <text x="150" y="375" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
+    </g>
+    <!-- Arrow 3 -->
+    <path d="M 150 385 V 415" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead-sample)"></path>
+    <!-- Node 4 -->
+    <g>
+        <rect x="40" y="425" width="220" height="70" rx="8" ry="8" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
+        <foreignObject x="40" y="425" width="220" height="70">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
+                تأكيد نهائي وإشعار الموظف
+            </div>
+        </foreignObject>
+        <text x="150" y="510" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
     </g>
 </svg>`;
 
@@ -298,17 +310,27 @@ const App = () => {
     };
 
     const extractTextFromImage = async (file) => {
-        const imagePart = await fileToGenerativePart(file);
-        const prompt = "استخرج كل النصوص الموجودة في هذه الصورة باللغة العربية. حافظ على التنسيق والفقرات قدر الإمكان.";
-        
-        const ai = new GoogleGenAI({ apiKey: getApiKey() });
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-preview-04-17',
-            contents: { parts: [imagePart, {text: prompt}] },
-            config: { thinkingConfig: { thinkingBudget: 0 } },
-        });
-
-        return response.text;
+        try {
+            const imagePart = await fileToGenerativePart(file);
+            const prompt = "استخرج كل النصوص الموجودة في هذه الصورة باللغة العربية. حافظ على التنسيق والفقرات قدر الإمكان.";
+            
+            const ai = new GoogleGenAI({ apiKey: getApiKey() });
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-04-17',
+                contents: { parts: [imagePart, {text: prompt}] },
+                config: { thinkingConfig: { thinkingBudget: 0 } },
+            });
+    
+            return response.text;
+        } catch (e) {
+            // If the error is the specific API key error, rethrow it with a more user-friendly message for this context.
+            if (e instanceof Error && e.message.includes('لم يتم العثور على مفتاح API')) {
+                throw new Error('تحليل الصور (OCR) يتطلب مفتاح API. يرجى تحميل ملف PDF أو إدخال النص يدويًا.');
+            }
+            // For other errors (network, etc.)
+            console.error("Image text extraction failed:", e);
+            throw new Error('فشل في استخراج النص من الصورة.');
+        }
     };
 
   const extractTocFromText = async (documentText) => {
@@ -404,25 +426,47 @@ ${documentContext}
 
     const promptForAnalysis = `
 أنت مساعد ذكاء اصطناعي خبير في تحليل الإجراءات والنصوص الإدارية، ومخرجك **يجب أن يكون دائماً باللغة العربية الفصحى**.
-**مهمتك الأساسية**: تحليل طلب المستخدم والنص المصدر المقدم لإنتاج كائن JSON واحد صالح. هذا الكائن يجب أن يحتوي على مفتاحين أساسيين:
+**مهمتك الأساسية**: تحليل طلب المستخدم والنص المصدر المقدم لإنتاج كائن JSON واحد صالح.
+
+**هيكل JSON المطلوب (قاعدة صارمة):**
+المخرج النهائي **يجب** أن يكون كائن JSON واحد يطابق الهيكل التالي تمامًا:
+\`\`\`json
+{
+  "summary": "ملخص تنفيذي عام للعملية، مكتوب كفقرة نثرية.",
+  "steps": [
+    {
+      "stepNumber": 1,
+      "description": "عنوان موجز ومكثف للمرحلة الأولى.",
+      "page": 1
+    },
+    {
+      "stepNumber": 2,
+      "description": "عنوان موجز ومكثف للمرحلة الثانية.",
+      "page": 2
+    }
+  ]
+}
+\`\`\`
+
+**تفاصيل المحتوى:**
 1.  \`summary\`: **ملخص تنفيذي**: يجب أن يكون هذا فقرة نثرية متماسكة وموجزة باللغة العربية، تقدم نظرة شاملة وعامة على العملية الموصوفة. **لا تقم بسرد الخطوات هنا**، بل قدم ملخصًا سرديًا.
 2.  \`steps\`: **خطوات العملية**: يجب أن يكون هذا مصفوفة من الكائنات، حيث يمثل كل كائن **مرحلة عمل رئيسية ومكتملة**.
-    *   **قاعدة حاسمة**: **لا تقم بتقسيم إجراء واحد إلى خطوات متعددة**. على سبيل المثال، إذا كان النص يصف "تعبئة النموذج ثم تقديمه"، فيجب أن يكون هذا خطوة واحدة بعنوان "تعبئة وتقديم النموذج"، وليس خطوتين منفصلتين. ادمج الأفعال المتسلسلة التي تشكل إجراءً واحدًا.
+    *   **قاعدة الدمج**: **لا تقم بتقسيم إجراء واحد إلى خطوات متعددة**. على سبيل المثال، إذا كان النص يصف "تعبئة النموذج ثم تقديمه"، فيجب أن يكون هذا خطوة واحدة بعنوان "تعبئة وتقديم النموذج". ادمج الأفعال المتسلسلة التي تشكل إجراءً واحدًا.
     *   كل كائن خطوة يجب أن يحتوي على:
         *   \`stepNumber\` (رقم).
-        *   \`description\` (**عنوان الخطوة**): **نص موجز جدًا ومكثف** يلخص جوهر المرحلة. يجب أن يكون هذا العنوان مصممًا للعرض داخل صندوق في مخطط انسيابي، مع العلم أن المستخدم يمكنه النقر للحصول على التفاصيل. **ركز على الفعل الأساسي والنتيجة**. مثال جيد: "تقديم طلب الإجازة". مثال سيء: "يقوم الموظف أولاً بفتح النظام ثم يذهب إلى قسم الإجازات ويملأ الحقول المطلوبة ثم يضغط على زر الإرسال".
+        *   \`description\` (**عنوان الخطوة**): **نص موجز جدًا ومكثف** يلخص جوهر المرحلة. يجب أن يكون هذا العنوان مصممًا للعرض داخل صندوق في مخطط انسيابي.
         *   \`page\` (رقم الصفحة المأخوذ من علامة \`[Source: Page X]\` في النص المصدر).
 
 **قواعد حاسمة لا يمكن تجاوزها:**
-1.  **اللغة العربية حصرًا**: كل النصوص المولدة، بما في ذلك \`summary\` و \`description\` لكل خطوة، يجب أن تكون باللغة العربية.
-2.  **استخلاص رقم الصفحة**: لكل خطوة في مصفوفة \`steps\`، من الضروري تحديد رقم الصفحة بدقة من أقرب علامة \`[Source: Page X]\` تسبق الخطوة في النص المصدر.
-3.  **تنسيق JSON نقي**: المخرج النهائي يجب أن يكون كائن JSON صالح تمامًا. لا تضف أي تعليقات، مقدمات، خواتيم، أو علامات markdown مثل \`\`\`json. فقط كائن JSON.
+1.  **اللغة العربية حصرًا**: كل النصوص المولدة يجب أن تكون باللغة العربية.
+2.  **استخلاص رقم الصفحة**: لكل خطوة، حدد رقم الصفحة بدقة من أقرب علامة \`[Source: Page X]\`.
+3.  **تنسيق JSON نقي**: المخرج النهائي يجب أن يكون كائن JSON صالح تمامًا كما هو موضح في الهيكل أعلاه. لا تضف أي تعليقات، مقدمات، خواتيم، أو علامات markdown مثل \`\`\`json. فقط كائن JSON.
 
 ---
 **طلب المستخدم:** ${effectiveQuery}
 **المستند المصدر:** ${documentContext}
 ---
-الآن، قم بإنشاء كائن JSON باللغة العربية فقط بناءً على التعليمات الصارمة أعلاه.`;
+الآن، قم بإنشاء كائن JSON باللغة العربية فقط بناءً على التعليمات الصارمة وهيكل JSON المحدد أعلاه.`;
 
     const promptForSvgGeneration = (planStepsJson) => `
 أنت فنان SVG خبير ومصمم جرافيك، متخصص في إنشاء مخططات انسيابية جمالية وواضحة وتفاعلية باللغة العربية. مهمتك هي تحويل بيانات JSON المقدمة إلى كود SVG واحد، جميل، ووظيفي.
@@ -485,23 +529,29 @@ ${planStepsJson}
       const planJsonText = extractJsonFromText(analysisResponse.text);
       const plan = JSON.parse(planJsonText);
 
-      if (!plan.summary || !plan.steps || !Array.isArray(plan.steps) || plan.steps.length === 0) {
-        throw new Error("فشلت الخطة التي تم إنشاؤها في التحقق.");
+      // The plan must be an object with a summary and a steps array.
+      if (!plan || typeof plan !== 'object' || !plan.summary || !plan.steps || !Array.isArray(plan.steps)) {
+        throw new Error("فشلت الخطة التي تم إنشاؤها في التحقق. لم يطابق الإخراج الهيكل المطلوب.");
       }
       summaryData.value = plan;
 
-      loadingMessage.value = 'المرحلة الثانية: رسم المخطط الانسيابي...';
-      const svgResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-04-17',
-        contents: promptForSvgGeneration(JSON.stringify(plan.steps, null, 2)),
-        config: { thinkingConfig: { thinkingBudget: 0 } },
-      });
+      // Only generate a flowchart if there are steps.
+      if (plan.steps.length > 0) {
+        loadingMessage.value = 'المرحلة الثانية: رسم المخطط الانسيابي...';
+        const svgResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-04-17',
+            contents: promptForSvgGeneration(JSON.stringify(plan.steps, null, 2)),
+            config: { thinkingConfig: { thinkingBudget: 0 } },
+        });
 
-      let svgContent = svgResponse.text.trim();
-      const svgMatch = svgContent.match(/<svg[\s\S]*?<\/svg>/);
-      if (!svgMatch || !svgMatch[0]) throw new Error("المخرجات التي تم إنشاؤها لا تحتوي على SVG صالح.");
-      
-      flowchartSvg.value = svgMatch[0];
+        let svgContent = svgResponse.text.trim();
+        const svgMatch = svgContent.match(/<svg[\s\S]*?<\/svg>/);
+        if (!svgMatch || !svgMatch[0]) throw new Error("المخرجات التي تم إنشاؤها لا تحتوي على SVG صالح.");
+        
+        flowchartSvg.value = svgMatch[0];
+      } else {
+        flowchartSvg.value = ''; // Clear any previous flowchart
+      }
 
       loadingMessage.value = 'المرحلة الثالثة: استخلاص أهم الأسئلة...';
       qaStatus.value = 'generating';
@@ -581,8 +631,37 @@ ${planStepsJson}
     
   const handleTrySample = () => {
       handleClear();
-      userInput.value = SAMPLE_DOCUMENT_TEXT;
-      setTimeout(() => handleGenerate('إجراء طلب إجازة سنوية'), 100);
+      status.value = 'generating';
+      loadingMessage.value = 'جاري تحميل المثال التوضيحي...';
+
+      // Simulate a small delay to make it feel like something is loading
+      setTimeout(() => {
+          userInput.value = SAMPLE_DOCUMENT_TEXT;
+          documentSource.value = SAMPLE_DOCUMENT_TEXT;
+          
+          summaryData.value = {
+              summary: "يهدف هذا الإجراء إلى توضيح الخطوات الرسمية لتقديم طلب إجازة سنوية للموظفين وضمان معالجته بكفاءة، بدءًا من تقديم الطلب عبر النظام، مرورًا بموافقة المدير المباشر، ثم اعتماد الموارد البشرية، وانتهاءً بتأكيد الطلب.",
+              steps: [
+                  { stepNumber: 1, description: "تقديم الطلب عبر النظام", page: 1 },
+                  { stepNumber: 2, description: "موافقة المدير المباشر", page: 1 },
+                  { stepNumber: 3, description: "اعتماد إدارة الموارد البشرية", page: 1 },
+                  { stepNumber: 4, description: "تأكيد نهائي وإشعار الموظف", page: 1 }
+              ]
+          };
+
+          flowchartSvg.value = SAMPLE_SVG_DATA;
+
+          topQuestions.value = [
+              { question: "كيف يقدم الموظف طلب الإجازة؟", answer: "يقوم الموظف بتسجيل الدخول إلى نظام الموارد البشرية الإلكتروني والتوجه إلى قسم 'الإجازات' لتعبئة طلب جديد." },
+              { question: "من الذي يوافق على الطلب أولاً؟", answer: "المدير المباشر هو أول من يراجع الطلب ويوافق عليه." },
+              { question: "ما هو دور إدارة الموارد البشرية في هذه العملية؟", answer: "تقوم بالتحقق النهائي من رصيد إجازات الموظف ومطابقة الطلب لسياسات الشركة قبل الاعتماد النهائي." },
+              { question: "كيف يعرف الموظف أن طلبه قد تمت الموافقة عليه؟", answer: "يتم إرسال بريد إلكتروني تلقائي للموظف لتأكيد الموافقة النهائية على إجازته." }
+          ];
+          
+          qaStatus.value = 'success';
+          status.value = 'success';
+          loadingMessage.value = '';
+      }, 500);
   };
 
   const handleClear = () => {
@@ -892,7 +971,8 @@ const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, 
       case 'success':
         return html`<${Fragment}>
             ${summaryData.value?.summary && html`<div class="summary-section"><h3>ملخص تنفيذي</h3><p>${summaryData.value.summary}</p></div>`}
-            <div class="image-container" onClick=${handleChartClick} dangerouslySetInnerHTML=${{ __html: flowchartSvg.value }}></div>
+            ${flowchartSvg.value && html`<div class="image-container" onClick=${handleChartClick} dangerouslySetInnerHTML=${{ __html: flowchartSvg.value }}></div>`}
+            ${!flowchartSvg.value && summaryData.value?.steps.length === 0 && html`<div class="info-box"><p>لم يتم العثور على خطوات إجرائية واضحة لإنشاء مخطط انسيابي.</p></div>`}
             <div class="export-container">
                 ${flowchartSvg.value && html`<button onClick=${handleExportSvg} class="clear-btn">تصدير المخطط (SVG)</button>`}
                 ${summaryData.value && html`<button onClick=${handleExportSummary} class="clear-btn">تصدير الملخص (TXT)</button>`}
