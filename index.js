@@ -7,7 +7,6 @@
 import { render, Fragment } from 'preact';
 import { html } from 'htm/preact';
 import { signal, effect } from '@preact/signals';
-// The GoogleGenAI import is no longer needed in the frontend.
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 // IMPORTANT: Replace this with your actual Cloudflare Worker URL
@@ -27,7 +26,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
  */
 const callSecureApi = async (model, contents, config = {}) => {
     if (!CLOUDFLARE_WORKER_URL || CLOUDFLARE_WORKER_URL.includes("your-worker-name")) {
-        throw new Error("Cloudflare Worker URL is not configured. Please update it in index.js.");
+        const error = new Error("Cloudflare Worker URL is not configured. Please update it in index.js.");
+        error.code = 'PROXY_NOT_CONFIGURED';
+        throw error;
     }
     
     // The worker expects a specific structure.
@@ -124,10 +125,6 @@ const downloadFile = (filename, content, mimeType) => {
     URL.revokeObjectURL(url);
 };
 
-// No longer needed as we are not using API key on the client.
-const getApiKey = () => true;
-
-
 // === Global Signals ===
 const activeTab = signal('generate');
 const theme = signal('light');
@@ -152,9 +149,10 @@ const quizStatus = signal('idle');
 const quizQuestions = signal([]);
 const currentQuestionIndex = signal(0);
 const userAnswers = signal([]);
-const quizError = signal('');
+const quizError = signal(null);
 const optimizationStatus = signal('idle');
 const optimizationSuggestions = signal([]);
+const optimizationError = signal(null);
 
 const APP_STATE_KEY = 'workflowAutomatorState';
 
@@ -257,9 +255,10 @@ const handleClear = () => {
     quizQuestions.value = [];
     currentQuestionIndex.value = 0;
     userAnswers.value = [];
-    quizError.value = '';
+    quizError.value = null;
     optimizationStatus.value = 'idle';
     optimizationSuggestions.value = [];
+    optimizationError.value = null;
     try {
         localStorage.removeItem(APP_STATE_KEY);
     } catch(e) {
@@ -302,8 +301,19 @@ const handleTrySample = () => {
       }, 500);
   };
 
-// ApiKeyMessage component is no longer needed as the frontend has no API key concept.
-// The error will be handled by the callSecureApi function.
+const ProxyNotConfiguredError = () => html`
+    <div class="error info" style=${{textAlign: 'right', lineHeight: '1.8'}}>
+        <h4 style=${{marginBottom: '0.5rem', fontSize: '1.2rem'}}>خطأ في الإعداد: مطلوب وكيل آمن (Proxy)</h4>
+        <p>لتأمين مفتاح API الخاص بك، تم تصميم هذا التطبيق لاستدعاء Google API عبر وسيط آمن (Cloudflare Worker).</p>
+        <p>الوسيط الخاص بك لم يتم تكوينه بعد. لتفعيل التحليل على مستنداتك الخاصة، يرجى:</p>
+        <ol style=${{marginRight: '1.5rem', marginTop: '1rem', marginBottom: '1rem', paddingRight: '0', listStyleType: 'decimal'}}>
+            <li style=${{marginBottom: '0.5rem'}}>فتح ملف <strong>index.js</strong> في محرر الكود.</li>
+            <li style=${{marginBottom: '0.5rem'}}>البحث عن المتغير <strong>CLOUDFLARE_WORKER_URL</strong>.</li>
+            <li>استبدال العنوان النائب <code>https://your-worker-name...</code> بعنوان URL الفعلي للعامل (Worker) الخاص بك.</li>
+        </ol>
+        <p>في هذه الأثناء، يمكنك الاستمرار في استكشاف التطبيق باستخدام <button class="clear-btn" style=${{padding: '2px 8px', fontSize: '0.9rem', verticalAlign: 'middle', border: '1px solid currentColor', cursor: 'pointer'}} onClick=${handleTrySample}>المثال التوضيحي</button>.</p>
+    </div>
+`;
 
 // Main App Component
 const App = () => {
@@ -401,6 +411,7 @@ const App = () => {
             return response.text;
         } catch (e) {
             console.error("Image text extraction failed:", e);
+            if (e instanceof Error && e.message.includes('Cloudflare Worker URL is not configured')) throw e;
             throw new Error('فشل في استخراج النص من الصورة.');
         }
     };
@@ -434,6 +445,7 @@ ${documentText}
         const toc = JSON.parse(jsonText);
         return (Array.isArray(toc) && toc.length > 0) ? toc : null;
     } catch (e) {
+        if (e instanceof Error && e.message.includes('Cloudflare Worker URL is not configured')) throw e;
         console.warn("Could not extract Table of Contents:", e);
         return null;
     }
@@ -483,8 +495,6 @@ ${documentContext}
         status.value = 'error';
         return;
     }
-    
-    // No API Key check on the client side anymore.
     
     let userQuery, documentContext;
 
@@ -636,7 +646,9 @@ ${planStepsJson}
     } catch(err) {
       console.error('Generation error:', err);
       qaStatus.value = 'error';
-      if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+      if (err instanceof Error && err.message.includes('Cloudflare Worker URL is not configured')) {
+          errorMessage.value = html`<${ProxyNotConfiguredError} />`;
+      } else if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
         errorMessage.value = html`<div class="error">عذرًا، الخدمة تواجه ضغطًا. يرجى المحاولة مرة أخرى لاحقًا.</div>`;
       } else {
         const errorMsg = err instanceof Error ? `فشل التحليل: ${err.message}` : 'حدث خطأ غير متوقع.';
@@ -681,8 +693,12 @@ ${planStepsJson}
         handleGenerate();
     } catch (err) {
         console.error('File processing error:', err);
-        const errorMsg = err instanceof Error ? err.message : 'فشل في معالجة الملف.';
-        errorMessage.value = html`<div class="error">${errorMsg}</div>`;
+        if (err instanceof Error && err.message.includes('Cloudflare Worker URL is not configured')) {
+            errorMessage.value = html`<${ProxyNotConfiguredError} />`;
+        } else {
+            const errorMsg = err instanceof Error ? err.message : 'فشل في معالجة الملف.';
+            errorMessage.value = html`<div class="error">${errorMsg}</div>`;
+        }
         status.value = 'error';
         pdfFileName.value = '';
     } finally {
@@ -746,7 +762,11 @@ ${planStepsJson}
         const currentHistory = chatHistory.value;
         const lastMessage = currentHistory[currentHistory.length - 1];
         if (lastMessage && lastMessage.role === 'model') {
-            lastMessage.content = "عذرًا، حدث خطأ أثناء محاولة الرد.";
+            if (e instanceof Error && e.message.includes('Cloudflare Worker URL is not configured')) {
+                lastMessage.content = "<strong>خطأ في الإعداد:</strong> لا يمكن الاتصال بالخادم. يرجى التأكد من تكوين عنوان Cloudflare Worker في <code>index.js</code>.";
+            } else {
+                lastMessage.content = "عذرًا، حدث خطأ أثناء محاولة الرد.";
+            }
             chatHistory.value = [...currentHistory];
         }
     } finally {
@@ -1141,7 +1161,7 @@ const QuizView = () => {
         if (!documentSource.value) return;
         
         quizStatus.value = 'generating';
-        quizError.value = '';
+        quizError.value = null;
         
         const prompt = `You are an AI assistant tasked with creating a quiz.
 **TASK:** Based *only* on the provided document text, generate an array of 10 multiple-choice questions.
@@ -1177,7 +1197,7 @@ Generate ONLY the JSON array.`;
 
         } catch (e) {
             console.error("Quiz generation error:", e);
-            quizError.value = "عذرًا، فشل إنشاء الاختبار. يرجى المحاولة مرة أخرى.";
+            quizError.value = e;
             quizStatus.value = 'error';
         }
     };
@@ -1196,7 +1216,7 @@ Generate ONLY the JSON array.`;
         quizQuestions.value = [];
         currentQuestionIndex.value = 0;
         userAnswers.value = [];
-        quizError.value = '';
+        quizError.value = null;
     };
 
     const handleExportResults = () => {
@@ -1233,9 +1253,15 @@ Generate ONLY the JSON array.`;
     }
     
     if (quizStatus.value === 'error') {
+        const isProxyError = quizError.value instanceof Error && quizError.value.message.includes('Cloudflare Worker URL is not configured');
+        const errorMessageText = (quizError.value instanceof Error ? quizError.value.message : String(quizError.value)) || "عذرًا، فشل إنشاء الاختبار. يرجى المحاولة مرة أخرى.";
+
         return html`
             <div class="quiz-view">
-                <div class="error">${quizError.value}</div>
+                 ${isProxyError
+                    ? html`<${ProxyNotConfiguredError} />`
+                    : html`<div class="error">${errorMessageText}</div>`
+                 }
                 <button onClick=${handleResetQuiz} style=${{marginTop: '1rem'}}>حاول مجددًا</button>
             </div>
         `;
@@ -1319,6 +1345,7 @@ const OptimizationView = () => {
     const handleGenerateOptimizations = async () => {
         optimizationStatus.value = 'generating';
         optimizationSuggestions.value = [];
+        optimizationError.value = null;
 
         const prompt = `
 أنت مستشار خبير في تحسين العمليات الإدارية (Business Process Optimization). مهمتك هي تحليل الإجراء الموصوف وتقديم اقتراحات ملموسة لتحسينه.
@@ -1360,6 +1387,7 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
 
         } catch (e) {
             console.error("Optimization generation error:", e);
+            optimizationError.value = e;
             optimizationStatus.value = 'error';
         }
     };
@@ -1385,9 +1413,14 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
     }
 
     if (optimizationStatus.value === 'error') {
+        const isProxyError = optimizationError.value instanceof Error && optimizationError.value.message.includes('Cloudflare Worker URL is not configured');
+        const errorMessageText = (optimizationError.value instanceof Error ? optimizationError.value.message : String(optimizationError.value)) || "عذرًا، فشل في إنشاء اقتراحات التحسين.";
         return html`
             <div class="optimization-view">
-                <div class="error">عذرًا، فشل في إنشاء اقتراحات التحسين.</div>
+                ${isProxyError
+                    ? html`<${ProxyNotConfiguredError} />`
+                    : html`<div class="error">${errorMessageText}</div>`
+                }
                 <button onClick=${handleGenerateOptimizations} style=${{marginTop: '1rem'}}>حاول مجددًا</button>
             </div>
         `;
