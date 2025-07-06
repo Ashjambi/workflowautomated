@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -6,11 +7,62 @@
 import { render, Fragment } from 'preact';
 import { html } from 'htm/preact';
 import { signal, effect } from '@preact/signals';
-import { GoogleGenAI } from '@google/genai';
+// The GoogleGenAI import is no longer needed in the frontend.
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-// Configure the PDF.js worker. This is required for the library to work correctly.
+// IMPORTANT: Replace this with your actual Cloudflare Worker URL
+const CLOUDFLARE_WORKER_URL = "https://your-worker-name.your-subdomain.workers.dev";
+
+
+// Configure the PDF.js worker.
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.mjs`;
+
+// === Secure API Caller via Cloudflare Worker ===
+/**
+ * A generic function to call our secure Cloudflare worker.
+ * @param {string} model The model to use (e.g., 'gemini-2.5-flash-preview-04-17').
+ * @param {string | object} contents The prompt or contents object.
+ * @param {object} config Additional configuration for the model.
+ * @returns {Promise<any>} The JSON response from the worker.
+ */
+const callSecureApi = async (model, contents, config = {}) => {
+    if (!CLOUDFLARE_WORKER_URL || CLOUDFLARE_WORKER_URL.includes("your-worker-name")) {
+        throw new Error("Cloudflare Worker URL is not configured. Please update it in index.js.");
+    }
+    
+    // The worker expects a specific structure.
+    const requestBody = {
+        model,
+        contents: Array.isArray(contents) ? { parts: contents } : { parts: [{ text: contents }] },
+        config
+    };
+
+    const response = await fetch(CLOUDFLARE_WORKER_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API call failed:", errorText);
+        // Simulate the Gemini error structure if possible
+        if (errorText.includes('quota')) {
+            throw new Error('RESOURCE_EXHAUSTED');
+        }
+        throw new Error(`API Error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // Simulate the .text property for compatibility with old code
+    // The Gemini API response structure is { candidates: [{ content: { parts: [{text: "..."}] } }] }
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return { ...data, text };
+};
+
 
 // === Helper Functions ===
 /**
@@ -22,13 +74,11 @@ const extractJsonFromText = (text) => {
     if (!text) return '';
     const trimmedText = text.trim();
     
-    // First, try to find a markdown block
     const fenceMatch = trimmedText.match(/```(?:json)?\s*([\s\S]*?)\s*```/s);
     if (fenceMatch && fenceMatch[1]) {
         return fenceMatch[1].trim();
     }
     
-    // If no markdown block, find the first '{' or '[' and the last '}' or ']'
     const firstBracket = trimmedText.indexOf('[');
     const firstBrace = trimmedText.indexOf('{');
 
@@ -42,7 +92,7 @@ const extractJsonFromText = (text) => {
     }
 
     if (startIndex === -1) {
-        return trimmedText; // Return original text if no JSON-like characters found
+        return trimmedText; 
     }
 
     const lastBracket = trimmedText.lastIndexOf(']');
@@ -53,7 +103,7 @@ const extractJsonFromText = (text) => {
         return trimmedText.substring(startIndex, endIndex + 1);
     }
     
-    return trimmedText; // Return original text as a fallback
+    return trimmedText;
 };
 
 /**
@@ -74,64 +124,36 @@ const downloadFile = (filename, content, mimeType) => {
     URL.revokeObjectURL(url);
 };
 
-/**
- * Safely retrieves the API key from the environment.
- * @returns {string|null} The API key, or null if not found.
- */
-const getApiKey = () => {
-    // This function provides a safe way to access the API key.
-    // In a real production environment, this would be handled by a secure backend
-    // or a build process that injects environment variables.
-    try {
-        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-            return process.env.API_KEY;
-        }
-    } catch(e) {
-        // process is not defined in all environments
-        return null;
-    }
-    // Return null if the key is not configured.
-    // Functions calling this are responsible for handling the null case.
-    return null;
-};
+// No longer needed as we are not using API key on the client.
+const getApiKey = () => true;
 
 
 // === Global Signals ===
-const activeTab = signal('generate'); // 'generate' | 'qa' | 'chat' | 'quiz' | 'optimize'
-const theme = signal('light'); // 'light' | 'dark'
-
-// --- Generation Tab Signals ---
+const activeTab = signal('generate');
+const theme = signal('light');
 const userInput = signal('');
 const pdfText = signal('');
 const pdfFileName = signal('');
 const flowchartSvg = signal('');
-const summaryData = signal(null); // Will hold { summary: string, steps: array }
-const tableOfContents = signal(null); // Will hold the extracted ToC array
-const status = signal('idle'); // 'idle' | 'parsing' | 'generating' | 'success' | 'error'
+const summaryData = signal(null);
+const tableOfContents = signal(null);
+const status = signal('idle');
 const loadingMessage = signal('');
-const errorMessage = signal('');
-const documentSource = signal(''); // Holds the definitive document source for all features
-const isListening = signal(false); // For speech recognition
-
-// --- Q&A Tab Signals ---
-const qaStatus = signal('idle'); // 'idle' | 'generating' | 'success' | 'error'
-const topQuestions = signal([]); // { question: string, answer: string }[]
-
-// --- Chat Tab Signals ---
-const chatHistory = signal([]); // { role: 'user' | 'model', content: string }[]
+const errorMessage = signal(null);
+const documentSource = signal('');
+const isListening = signal(false);
+const qaStatus = signal('idle');
+const topQuestions = signal([]);
+const chatHistory = signal([]);
 const chatInput = signal('');
 const isChatting = signal(false);
-const isNodeQuery = signal(false); // Flag to indicate if chat was initiated from a node click
-
-// --- Quiz Tab Signals ---
-const quizStatus = signal('idle'); // 'idle' | 'generating' | 'active' | 'finished' | 'error'
+const isNodeQuery = signal(false);
+const quizStatus = signal('idle');
 const quizQuestions = signal([]);
 const currentQuestionIndex = signal(0);
 const userAnswers = signal([]);
 const quizError = signal('');
-
-// --- Optimization Tab Signals ---
-const optimizationStatus = signal('idle'); // 'idle' | 'generating' | 'success' | 'error'
+const optimizationStatus = signal('idle');
 const optimizationSuggestions = signal([]);
 
 const APP_STATE_KEY = 'workflowAutomatorState';
@@ -214,59 +236,30 @@ const SAMPLE_DOCUMENT_TEXT = `[Source: Page 1]
 4.  **تأكيد نهائي وإشعار الموظف:** بمجرد اعتماد الطلب من قبل الموارد البشرية، يتم إرسال بريد إلكتروني تلقائي للموظف لتأكيد الموافقة على إجازته. يتم تحديث رصيد إجازات الموظف في النظام بشكل فوري.
 `;
 
-const TocComponent = ({ toc, onItemClick }) => {
-  if (!toc || toc.length === 0) return null;
-
-  return html`
-    <div class="toc-section">
-      <h3>فهرس المحتويات</h3>
-      <p>انقر على قسم لبدء التحليل وإنشاء المخطط الانسيابي له.</p>
-      <ul>
-        ${toc.map(item => html`
-          <li 
-            onClick=${() => onItemClick(item)}
-            style=${{ paddingRight: `${(item.level > 1 ? (item.level -1) * 20 : 0) + 16}px` }}
-            title="تحليل القسم: ${item.title}"
-          >
-            <span class="toc-title">${item.title}</span>
-            <span class="toc-page">ص ${item.page}</span>
-          </li>
-        `)}
-      </ul>
-    </div>
-  `;
-};
-
 const handleClear = () => {
-    // Generation tab
     userInput.value = '';
     pdfText.value = '';
     documentSource.value = '';
     pdfFileName.value = '';
     tableOfContents.value = null;
     flowchartSvg.value = '';
-    errorMessage.value = '';
+    errorMessage.value = null;
     summaryData.value = null;
     status.value = 'idle';
     loadingMessage.value = '';
     isListening.value = false;
-    // Q&A tab
     qaStatus.value = 'idle';
     topQuestions.value = [];
-    // Chat tab
     chatHistory.value = [];
     chatInput.value = '';
     isChatting.value = false;
-    // Quiz tab
     quizStatus.value = 'idle';
     quizQuestions.value = [];
     currentQuestionIndex.value = 0;
     userAnswers.value = [];
     quizError.value = '';
-    // Optimization tab
     optimizationStatus.value = 'idle';
     optimizationSuggestions.value = [];
-    // Clear saved state from localStorage
     try {
         localStorage.removeItem(APP_STATE_KEY);
     } catch(e) {
@@ -279,9 +272,8 @@ const handleTrySample = () => {
       status.value = 'generating';
       loadingMessage.value = 'جاري تحميل المثال التوضيحي...';
 
-      // Simulate a small delay to make it feel like something is loading
       setTimeout(() => {
-          userInput.value = ''; // Clear user input for sample
+          userInput.value = '';
           pdfText.value = SAMPLE_DOCUMENT_TEXT;
           documentSource.value = SAMPLE_DOCUMENT_TEXT;
           
@@ -309,6 +301,9 @@ const handleTrySample = () => {
           loadingMessage.value = '';
       }, 500);
   };
+
+// ApiKeyMessage component is no longer needed as the frontend has no API key concept.
+// The error will be handled by the callSecureApi function.
 
 // Main App Component
 const App = () => {
@@ -380,7 +375,6 @@ const App = () => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                // Get the base64 string, remove the data URI prefix
                 const base64Data = reader.result.split(',')[1];
                 resolve({
                     inlineData: {
@@ -395,21 +389,15 @@ const App = () => {
     };
 
     const extractTextFromImage = async (file) => {
-        const apiKey = getApiKey();
-        if (!apiKey) {
-            throw new Error('فشل تحليل الصورة: لم يتم العثور على مفتاح API.');
-        }
         try {
             const imagePart = await fileToGenerativePart(file);
             const prompt = "استخرج كل النصوص الموجودة في هذه الصورة باللغة العربية. حافظ على التنسيق والفقرات قدر الإمكان.";
             
-            const ai = new GoogleGenAI({ apiKey });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-preview-04-17',
-                contents: { parts: [imagePart, {text: prompt}] },
-                config: { thinkingConfig: { thinkingBudget: 0 } },
-            });
-    
+            const response = await callSecureApi(
+                'gemini-2.5-flash-preview-04-17',
+                [imagePart, {text: prompt}],
+                { thinkingBudget: 0 }
+            );
             return response.text;
         } catch (e) {
             console.error("Image text extraction failed:", e);
@@ -419,12 +407,6 @@ const App = () => {
 
   const extractTocFromText = async (documentText) => {
     if (!documentText) return null;
-
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        console.warn("API Key not found, skipping ToC extraction.");
-        return null;
-    }
 
     const prompt = `
 أنت خبير في تحليل المستندات والتعرف على بنيتها، متخصص في المستندات العربية. مهمتك هي استخراج جدول المحتويات (ToC) من نص المستند المقدم.
@@ -442,12 +424,11 @@ ${documentText}
 ---
 قم بإنشاء مصفوفة JSON فقط. إذا لم يتم العثور على جدول محتويات، قم بإرجاع مصفوفة فارغة \`[]\`.`;
     try {
-        const ai = new GoogleGenAI({ apiKey });
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-preview-04-17',
-            contents: prompt,
-            config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
-        });
+        const response = await callSecureApi(
+            'gemini-2.5-flash-preview-04-17',
+            prompt,
+            { responseMimeType: "application/json", thinkingBudget: 0 }
+        );
         
         const jsonText = extractJsonFromText(response.text);
         const toc = JSON.parse(jsonText);
@@ -459,11 +440,6 @@ ${documentText}
   };
     
   const generateTopQuestions = async (documentContext, sectionContext) => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        console.warn("API Key not found, skipping QA generation.");
-        return [];
-    }
 
     const prompt = `أنت مساعد ذكاء اصطناعي متخصص في استخلاص المعلومات الأساسية من النصوص. مهمتك هي إنشاء قائمة بالأسئلة والأجوبة الأكثر أهمية بناءً على القسم المحدد من النص المقدم.
 
@@ -484,12 +460,11 @@ ${documentContext}
 ---
 الآن، قم بإنشاء مصفوفة JSON فقط بناءً على القسم المحدد.`;
 
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-04-17',
-        contents: prompt,
-        config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
-    });
+    const response = await callSecureApi(
+        'gemini-2.5-flash-preview-04-17',
+        prompt,
+        { responseMimeType: "application/json", thinkingBudget: 0 }
+    );
 
     const jsonText = extractJsonFromText(response.text);
     const qaData = JSON.parse(jsonText);
@@ -504,40 +479,34 @@ ${documentContext}
     const contextFromPdf = pdfText.value.trim();
     
     if (!contextFromInput && !contextFromPdf) {
-        errorMessage.value = "الرجاء إدخال نص أو تحميل ملف لتحليله.";
+        errorMessage.value = html`<div class="error">الرجاء إدخال نص أو تحميل ملف لتحليله.</div>`;
         status.value = 'error';
         return;
     }
+    
+    // No API Key check on the client side anymore.
     
     let userQuery, documentContext;
 
     if (contextFromPdf) {
         documentContext = contextFromPdf;
-        userQuery = contextFromInput; // Can be an empty string
+        userQuery = contextFromInput;
     } else {
         documentContext = contextFromInput;
-        userQuery = ''; // The whole input is the document, so no specific query
+        userQuery = '';
     }
 
     if (!documentContext) return;
-    documentSource.value = documentContext; // Set the global source for other tabs
+    documentSource.value = documentContext;
 
     status.value = 'generating';
     qaStatus.value = 'idle';
     optimizationStatus.value = 'idle';
     topQuestions.value = [];
     flowchartSvg.value = '';
-    errorMessage.value = '';
+    errorMessage.value = null;
     summaryData.value = null;
     optimizationSuggestions.value = [];
-
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        errorMessage.value = 'فشل التحليل: لم يتم العثور على مفتاح API. لتفعيل التحليل على مستنداتك الخاصة، يجب تكوين مفتاح API في بيئة التشغيل.';
-        status.value = 'error';
-        loadingMessage.value = '';
-        return;
-    }
     
     const effectiveQuery = userQuery || "لخص العملية الرئيسية الموضحة في هذا المستند بالكامل.";
 
@@ -625,31 +594,27 @@ ${planStepsJson}
     
     try {
       loadingMessage.value = 'المرحلة الأولى: تحليل المستند...';
-      const ai = new GoogleGenAI({ apiKey });
-
-      const analysisResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-04-17',
-        contents: promptForAnalysis,
-        config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
-      });
-
+      const analysisResponse = await callSecureApi(
+        'gemini-2.5-flash-preview-04-17',
+        promptForAnalysis,
+        { responseMimeType: "application/json", thinkingBudget: 0 }
+      );
+      
       const planJsonText = extractJsonFromText(analysisResponse.text);
       const plan = JSON.parse(planJsonText);
 
-      // The plan must be an object with a summary and a steps array.
       if (!plan || typeof plan !== 'object' || !plan.summary || !plan.steps || !Array.isArray(plan.steps)) {
         throw new Error("فشلت الخطة التي تم إنشاؤها في التحقق. لم يطابق الإخراج الهيكل المطلوب.");
       }
       summaryData.value = plan;
 
-      // Only generate a flowchart if there are steps.
       if (plan.steps.length > 0) {
         loadingMessage.value = 'المرحلة الثانية: رسم المخطط الانسيابي...';
-        const svgResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-preview-04-17',
-            contents: promptForSvgGeneration(JSON.stringify(plan.steps, null, 2)),
-            config: { thinkingConfig: { thinkingBudget: 0 } },
-        });
+        const svgResponse = await callSecureApi(
+            'gemini-2.5-flash-preview-04-17',
+            promptForSvgGeneration(JSON.stringify(plan.steps, null, 2)),
+            { thinkingBudget: 0 }
+        );
 
         let svgContent = svgResponse.text.trim();
         const svgMatch = svgContent.match(/<svg[\s\S]*?<\/svg>/);
@@ -657,7 +622,7 @@ ${planStepsJson}
         
         flowchartSvg.value = svgMatch[0];
       } else {
-        flowchartSvg.value = ''; // Clear any previous flowchart
+        flowchartSvg.value = '';
       }
 
       loadingMessage.value = 'المرحلة الثالثة: استخلاص أهم الأسئلة...';
@@ -672,13 +637,13 @@ ${planStepsJson}
       console.error('Generation error:', err);
       qaStatus.value = 'error';
       if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
-        errorMessage.value = 'عذرًا، الخدمة تواجه ضغطًا. يرجى المحاولة مرة أخرى لاحقًا.';
-        flowchartSvg.value = ''; // Clear svg on quota error
-        status.value = 'error';
+        errorMessage.value = html`<div class="error">عذرًا، الخدمة تواجه ضغطًا. يرجى المحاولة مرة أخرى لاحقًا.</div>`;
       } else {
-        errorMessage.value = err instanceof Error ? `فشل التحليل: ${err.message}` : 'حدث خطأ غير متوقع.';
-        status.value = 'error';
+        const errorMsg = err instanceof Error ? `فشل التحليل: ${err.message}` : 'حدث خطأ غير متوقع.';
+        errorMessage.value = html`<div class="error">${errorMsg}</div>`;
       }
+      flowchartSvg.value = '';
+      status.value = 'error';
     } finally {
         loadingMessage.value = '';
     }
@@ -690,7 +655,7 @@ ${planStepsJson}
     
     handleClear();
     pdfFileName.value = file.name;
-    e.target.value = ''; // Reset the file input
+    e.target.value = '';
     status.value = 'parsing';
     
     try {
@@ -709,20 +674,15 @@ ${planStepsJson}
         pdfText.value = text;
         documentSource.value = text;
         
-        const apiKey = getApiKey();
-        // Only try to extract ToC if an API key exists
-        if (apiKey && file.type === 'application/pdf') {
-            loadingMessage.value = 'جاري استخراج فهرس المحتويات...';
-            tableOfContents.value = await extractTocFromText(text);
-        } else {
-            tableOfContents.value = null; // No ToC for images or if no API key
-        }
+        loadingMessage.value = 'جاري استخراج فهرس المحتويات...';
+        tableOfContents.value = await extractTocFromText(text);
         
         status.value = 'idle';
-        handleGenerate(); // Automatically start analysis after successful file processing
+        handleGenerate();
     } catch (err) {
         console.error('File processing error:', err);
-        errorMessage.value = err instanceof Error ? err.message : 'فشل في معالجة الملف.';
+        const errorMsg = err instanceof Error ? err.message : 'فشل في معالجة الملف.';
+        errorMessage.value = html`<div class="error">${errorMsg}</div>`;
         status.value = 'error';
         pdfFileName.value = '';
     } finally {
@@ -733,7 +693,7 @@ ${planStepsJson}
   const handleTocClick = (item) => {
     summaryData.value = null;
     flowchartSvg.value = '';
-    errorMessage.value = '';
+    errorMessage.value = null;
     userInput.value = `لخّص واعرض المخطط الانسيابي للقسم بعنوان "${item.title}"`;
     handleGenerate(item.title);
   };
@@ -741,7 +701,7 @@ ${planStepsJson}
   const handleClearResults = () => {
     userInput.value = '';
     flowchartSvg.value = '';
-    errorMessage.value = '';
+    errorMessage.value = null;
     summaryData.value = null;
     status.value = 'idle';
     loadingMessage.value = '';
@@ -752,26 +712,12 @@ ${planStepsJson}
     if (!userMessage || isChatting.value || !documentSource.value) return;
 
     const newHistory = [...chatHistory.value, { role: 'user', content: userMessage }];
-    chatHistory.value = newHistory; // Show user message
+    chatHistory.value = newHistory;
     chatInput.value = '';
     isChatting.value = true;
     
-    // Add placeholder for model's streaming response
     chatHistory.value = [...newHistory, { role: 'model', content: '' }];
 
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        const finalHistory = chatHistory.value;
-        const lastMessage = finalHistory[finalHistory.length - 1];
-        if (lastMessage && lastMessage.role === 'model') {
-            lastMessage.content = "ميزة الدردشة تتطلب مفتاح API للعمل على المستندات الخاصة. أنت حاليًا تتفاعل مع المثال التوضيحي.";
-            chatHistory.value = [...finalHistory];
-        }
-        isChatting.value = false;
-        return;
-    }
-
-    // Check if this is a query from a flowchart node and reset the flag
     const nodeQuery = isNodeQuery.value;
     isNodeQuery.value = false;
 
@@ -779,36 +725,21 @@ ${planStepsJson}
     const defaultInstruction = `أنت مساعد ذكاء اصطناعي. أجب على أسئلة المستخدم باللغة العربية بناءً على المستند المصدر المقدم **فقط**. إذا كانت الإجابة غير موجودة بشكل صريح في المستند، يجب أن تقول "المعلومات المطلوبة غير متوفرة في المستند."`;
 
     const systemInstruction = nodeQuery ? nodeQueryInstruction : defaultInstruction;
+    
+    const chatPrompt = `${systemInstruction}\n\n---### **المستند المصدر**---\n${documentSource.value}\n\n---### **سجل الدردشة**---\n${newHistory.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
     try {
-        const ai = new GoogleGenAI({ apiKey });
-        
-        // Get history BEFORE the last user message for context
-        const historyForChat = newHistory.slice(0, -1).map(msg => ({
-            role: msg.role,
-            parts: [{ text: msg.content }]
-        }));
+        const response = await callSecureApi(
+            'gemini-2.5-flash-preview-04-17',
+            chatPrompt,
+            { thinkingBudget: 0 }
+        );
 
-        const chat = ai.chats.create({
-          model: 'gemini-2.5-flash-preview-04-17',
-          // The Chat object can take a system instruction and the full document context.
-          config: {
-            systemInstruction: `${systemInstruction}\n\n---### **المستند المصدر**---\n${documentSource.value}`,
-          },
-          history: historyForChat,
-        });
-
-        const responseStream = await chat.sendMessageStream({message: userMessage});
-
-        for await (const chunk of responseStream) {
-            const currentHistory = chatHistory.value;
-            const lastMessage = currentHistory[currentHistory.length - 1];
-            // Ensure we are updating the model's message placeholder
-            if (lastMessage && lastMessage.role === 'model') {
-                lastMessage.content += chunk.text;
-                // Trigger a re-render by creating a new array
-                chatHistory.value = [...currentHistory];
-            }
+        const currentHistory = chatHistory.value;
+        const lastMessage = currentHistory[currentHistory.length - 1];
+        if (lastMessage && lastMessage.role === 'model') {
+            lastMessage.content = response.text;
+            chatHistory.value = [...currentHistory];
         }
     } catch (e) {
         console.error("Chat error:", e);
@@ -828,8 +759,7 @@ ${planStepsJson}
 
     const userMessage = `اشرح لي هذه الخطوة من المخطط بالتفصيل: "${nodeText}"`;
     activeTab.value = 'chat';
-
-    isNodeQuery.value = true; // Set the flag before triggering send
+    isNodeQuery.value = true;
 
     setTimeout(() => {
         chatInput.value = userMessage;
@@ -845,13 +775,11 @@ ${planStepsJson}
         }
 
         const recognition = new SpeechRecognition();
-        recognition.lang = 'ar-SA'; // Arabic - Saudi Arabia
+        recognition.lang = 'ar-SA';
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
-        recognition.onstart = () => {
-            isListening.value = true;
-        };
+        recognition.onstart = () => isListening.value = true;
 
         recognition.onresult = (event) => {
             const speechResult = event.results[0][0].transcript;
@@ -865,9 +793,7 @@ ${planStepsJson}
             }
         };
 
-        recognition.onend = () => {
-            isListening.value = false;
-        };
+        recognition.onend = () => isListening.value = false;
 
         if (isListening.value) {
             recognition.stop();
@@ -1014,7 +940,7 @@ const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, 
       case 'generating':
         return html`<div class="loader-container"><div class="loader"></div><p class="loading-text">${loadingMessage.value}</p></div>`;
       case 'error':
-        return html`<div class="error">${errorMessage.value}</div>`;
+        return errorMessage.value;
       case 'success':
         return html`<${Fragment}>
             ${summaryData.value?.summary && html`<div class="summary-section"><h3>ملخص تنفيذي</h3><p>${summaryData.value.summary}</p></div>`}
@@ -1039,6 +965,28 @@ const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, 
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
         <path d="M192 0C139 0 96 43 96 96V256c0 53 43 96 96 96s96-43 96-96V96c0-53-43-96-96-96zM64 216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 89.1 66.2 162.7 152 174.4V464H120c-13.3 0-24 10.7-24 24s10.7 24 24 24h144c13.3 0 24-10.7 24-24s-10.7-24-24-24H216V430.4c85.8-11.7 152-85.3 152-174.4V216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 70.7-57.3 128-128 128s-128-57.3-128-128V216z"/>
     </svg>`;
+
+  const TocComponent = ({ toc, onItemClick }) => {
+    if (!toc || toc.length === 0) return null;
+    return html`
+      <div class="toc-section">
+        <h3>فهرس المحتويات</h3>
+        <p>انقر على قسم لبدء التحليل وإنشاء المخطط الانسيابي له.</p>
+        <ul>
+          ${toc.map(item => html`
+            <li 
+              onClick=${() => onItemClick(item)}
+              style=${{ paddingRight: `${(item.level > 1 ? (item.level -1) * 20 : 0) + 16}px` }}
+              title="تحليل القسم: ${item.title}"
+            >
+              <span class="toc-title">${item.title}</span>
+              <span class="toc-page">ص ${item.page}</span>
+            </li>
+          `)}
+        </ul>
+      </div>
+    `;
+  };
 
   return html`
     <div class="input-section">
@@ -1072,7 +1020,6 @@ const QAView = () => {
         downloadFile('questions_and_answers.json', jsonContent, 'application/json;charset=utf-8');
     };
     
-    const apiKey = getApiKey();
     const hasSource = !!documentSource.value;
 
     if (!hasSource) {
@@ -1084,16 +1031,6 @@ const QAView = () => {
         `;
     }
     
-    if (!apiKey && hasSource && topQuestions.value.length === 0) {
-        return html`
-            <div class="disabled-view">
-                <h3>أهم الأسئلة والأجوبة</h3>
-                <p>هذه الميزة تتطلب مفتاح API. يرجى تكوين مفتاح API لتوليد الأسئلة من مستندك.</p>
-                <p style=${{marginTop:'1rem', fontSize:'0.9rem'}}>أنت الآن ترى النتائج الخاصة بالمثال التوضيحي.</p>
-            </div>
-        `;
-    }
-
     if (qaStatus.value === 'generating') {
         return html`
             <div class="qa-view">
@@ -1140,7 +1077,6 @@ const QAView = () => {
 };
 
 const ChatView = ({ onSendMessage }) => {
-    // Effect to scroll to the bottom of the chat history when a new message is added.
     effect(() => {
         if (chatHistory.value.length) {
             const historyElement = document.querySelector('.chat-history');
@@ -1200,19 +1136,12 @@ const ChatView = ({ onSendMessage }) => {
 };
 
 const QuizView = () => {
-    const apiKey = getApiKey();
 
     const handleStartQuiz = async () => {
         if (!documentSource.value) return;
         
         quizStatus.value = 'generating';
         quizError.value = '';
-
-        if (!apiKey) {
-            quizError.value = "ميزة الاختبار تتطلب مفتاح API. يرجى تكوين مفتاح API لبدء اختبار على مستندك.";
-            quizStatus.value = 'error';
-            return;
-        }
         
         const prompt = `You are an AI assistant tasked with creating a quiz.
 **TASK:** Based *only* on the provided document text, generate an array of 10 multiple-choice questions.
@@ -1229,12 +1158,11 @@ ${documentSource.value}
 Generate ONLY the JSON array.`;
 
         try {
-            const ai = new GoogleGenAI({ apiKey });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-preview-04-17',
-                contents: prompt,
-                config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
-            });
+            const response = await callSecureApi(
+                'gemini-2.5-flash-preview-04-17',
+                prompt,
+                { responseMimeType: "application/json", thinkingBudget: 0 }
+            );
 
             const jsonText = extractJsonFromText(response.text);
             const questions = JSON.parse(jsonText);
@@ -1295,8 +1223,6 @@ Generate ONLY the JSON array.`;
         downloadFile('quiz_results.txt', content, 'text/plain;charset=utf-8');
     };
 
-
-    // Render logic based on quizStatus
     if (!documentSource.value) {
         return html`
             <div class="disabled-view">
@@ -1305,7 +1231,7 @@ Generate ONLY the JSON array.`;
             </div>
         `;
     }
-
+    
     if (quizStatus.value === 'error') {
         return html`
             <div class="quiz-view">
@@ -1379,7 +1305,6 @@ Generate ONLY the JSON array.`;
         `;
     }
 
-    // Default 'idle' state
     return html`
         <div class="quiz-view">
             <h3>اختبر معلوماتك</h3>
@@ -1390,16 +1315,10 @@ Generate ONLY the JSON array.`;
 };
 
 const OptimizationView = () => {
-    const apiKey = getApiKey();
 
     const handleGenerateOptimizations = async () => {
         optimizationStatus.value = 'generating';
         optimizationSuggestions.value = [];
-
-        if (!apiKey) {
-            optimizationStatus.value = 'error';
-            return;
-        }
 
         const prompt = `
 أنت مستشار خبير في تحسين العمليات الإدارية (Business Process Optimization). مهمتك هي تحليل الإجراء الموصوف وتقديم اقتراحات ملموسة لتحسينه.
@@ -1425,12 +1344,11 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
 الآن، قم بإنشاء مصفوفة JSON فقط تحتوي على اقتراحات التحسين باللغة العربية.`;
         
         try {
-            const ai = new GoogleGenAI({ apiKey });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-preview-04-17',
-                contents: prompt,
-                config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
-            });
+            const response = await callSecureApi(
+                'gemini-2.5-flash-preview-04-17',
+                prompt,
+                { responseMimeType: "application/json", thinkingBudget: 0 }
+            );
             const jsonText = extractJsonFromText(response.text);
             const suggestions = JSON.parse(jsonText);
             
@@ -1454,7 +1372,7 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
             </div>
         `;
     }
-
+    
     if (optimizationStatus.value === 'generating') {
         return html`
             <div class="optimization-view">
@@ -1469,7 +1387,7 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
     if (optimizationStatus.value === 'error') {
         return html`
             <div class="optimization-view">
-                <div class="error">عذرًا، فشل في إنشاء اقتراحات التحسين. هذه الميزة تتطلب مفتاح API.</div>
+                <div class="error">عذرًا، فشل في إنشاء اقتراحات التحسين.</div>
                 <button onClick=${handleGenerateOptimizations} style=${{marginTop: '1rem'}}>حاول مجددًا</button>
             </div>
         `;
@@ -1495,7 +1413,6 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
         `;
     }
 
-    // Default 'idle' state
     return html`
         <div class="optimization-view">
             <h3>تحسين الإجراءات بواسطة الذكاء الاصطناعي</h3>
@@ -1512,7 +1429,6 @@ const loadStateFromLocalStorage = () => {
         if (savedStateJSON) {
             const savedState = JSON.parse(savedStateJSON);
             
-            // Set theme first as it affects rendering
             const savedTheme = savedState.theme || 'light';
             theme.value = savedTheme;
             document.body.className = savedTheme === 'dark' ? 'dark-theme' : '';
@@ -1530,7 +1446,6 @@ const loadStateFromLocalStorage = () => {
             quizQuestions.value = savedState.quizQuestions ?? [];
             optimizationSuggestions.value = savedState.optimizationSuggestions ?? [];
 
-            // Set statuses based on loaded data
             if (documentSource.value) {
                 if (summaryData.value) status.value = 'success';
                 else status.value = 'idle';
@@ -1547,27 +1462,21 @@ const loadStateFromLocalStorage = () => {
         }
     } catch (e) {
         console.warn("Could not load or parse state from localStorage:", e);
-        localStorage.removeItem(APP_STATE_KEY); // Clear potentially corrupted state
+        localStorage.removeItem(APP_STATE_KEY);
     }
 };
 
 const initializeApp = () => {
     loadStateFromLocalStorage();
 
-    // If, after loading state, there is no source document (i.e., new user or cleared state),
-    // then load the sample data to present a fully interactive initial state.
     if (!documentSource.value) {
         handleTrySample();
     }
 
-    // Effect to auto-save state to localStorage whenever a relevant signal changes
     effect(() => {
-        // Apply theme class to body
         document.body.className = theme.value === 'dark' ? 'dark-theme' : '';
         
-        // Don't save state if an API key error just occurred for a user action,
-        // as this prevents overwriting good state with an error state.
-        if (status.value === 'error' && errorMessage.value.includes('مفتاح API')) {
+        if (status.value === 'error' && errorMessage.value?.props?.featureName) {
             return;
         }
 
