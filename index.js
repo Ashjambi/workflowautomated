@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -8,61 +9,13 @@ import { render, Fragment } from 'preact';
 import { html } from 'htm/preact';
 import { signal, effect } from '@preact/signals';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { GoogleGenAI } from "@google/genai";
 
-// IMPORTANT: Replace this with your actual Cloudflare Worker URL
-const CLOUDFLARE_WORKER_URL = "https://your-worker-name.your-subdomain.workers.dev";
-
+// Initialize the Google AI client
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Configure the PDF.js worker.
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.mjs`;
-
-// === Secure API Caller via Cloudflare Worker ===
-/**
- * A generic function to call our secure Cloudflare worker.
- * @param {string} model The model to use (e.g., 'gemini-2.5-flash-preview-04-17').
- * @param {string | object} contents The prompt or contents object.
- * @param {object} config Additional configuration for the model.
- * @returns {Promise<any>} The JSON response from the worker.
- */
-const callSecureApi = async (model, contents, config = {}) => {
-    if (!CLOUDFLARE_WORKER_URL || CLOUDFLARE_WORKER_URL.includes("your-worker-name")) {
-        const error = new Error("Cloudflare Worker URL is not configured. Please update it in index.js.");
-        error.code = 'PROXY_NOT_CONFIGURED';
-        throw error;
-    }
-    
-    // The worker expects a specific structure.
-    const requestBody = {
-        model,
-        contents: Array.isArray(contents) ? { parts: contents } : { parts: [{ text: contents }] },
-        config
-    };
-
-    const response = await fetch(CLOUDFLARE_WORKER_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API call failed:", errorText);
-        // Simulate the Gemini error structure if possible
-        if (errorText.includes('quota')) {
-            throw new Error('RESOURCE_EXHAUSTED');
-        }
-        throw new Error(`API Error: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    // Simulate the .text property for compatibility with old code
-    // The Gemini API response structure is { candidates: [{ content: { parts: [{text: "..."}] } }] }
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return { ...data, text };
-};
 
 
 // === Helper Functions ===
@@ -156,84 +109,6 @@ const optimizationError = signal(null);
 
 const APP_STATE_KEY = 'workflowAutomatorState';
 
-const SAMPLE_SVG_DATA = `<svg width="300" height="550" viewBox="0 0 300 550" xmlns="http://www.w3.org/2000/svg" font-family="'Tajawal', Tahoma, sans-serif">
-    <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#28a745"></polygon>
-        </marker>
-        <filter id="dropShadow" height="130%">
-            <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.1)"></feDropShadow>
-        </filter>
-        <style>
-            .clickable-node { cursor: pointer; } 
-            g.clickable-node > rect { transition: stroke 0.2s ease, stroke-width 0.2s ease; } 
-            g.clickable-node:hover > rect { stroke-width: 3px; stroke: #218838; }
-        </style>
-    </defs>
-    <!-- Node 1 -->
-    <g id="node-1" class="clickable-node" filter="url(#dropShadow)">
-        <rect x="40" y="20" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
-        <foreignObject x="40" y="20" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
-                تقديم الطلب عبر النظام
-            </div>
-        </foreignObject>
-        <text x="150" y="105" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
-    </g>
-    <!-- Arrow 1 -->
-    <path d="M 150 115 V 145" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead)"></path>
-    <!-- Node 2 -->
-    <g id="node-2" class="clickable-node" filter="url(#dropShadow)">
-        <rect x="40" y="155" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
-        <foreignObject x="40" y="155" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
-                موافقة المدير المباشر
-            </div>
-        </foreignObject>
-        <text x="150" y="240" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
-    </g>
-    <!-- Arrow 2 -->
-    <path d="M 150 250 V 280" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead)"></path>
-    <!-- Node 3 -->
-    <g id="node-3" class="clickable-node" filter="url(#dropShadow)">
-        <rect x="40" y="290" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
-        <foreignObject x="40" y="290" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
-                اعتماد إدارة الموارد البشرية
-            </div>
-        </foreignObject>
-        <text x="150" y="375" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
-    </g>
-    <!-- Arrow 3 -->
-    <path d="M 150 385 V 415" stroke="#28a745" stroke-width="2" marker-end="url(#arrowhead)"></path>
-    <!-- Node 4 -->
-    <g id="node-4" class="clickable-node" filter="url(#dropShadow)">
-        <rect x="40" y="425" width="220" height="70" rx="12" ry="12" fill="#ffffff" stroke="#28a745" stroke-width="2"></rect>
-        <foreignObject x="40" y="425" width="220" height="70">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing: border-box; padding: 10px 15px; color: #343a40; font-family: 'Tajawal', Tahoma, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; text-align: center; word-wrap: break-word; overflow-wrap: break-word; height: 100%; display: flex; justify-content: center; align-items: center;">
-                تأكيد نهائي وإشعار الموظف
-            </div>
-        </foreignObject>
-        <text x="150" y="510" font-size="12px" fill="#6c757d" text-anchor="middle">(المصدر: صفحة 1)</text>
-    </g>
-</svg>`;
-
-const SAMPLE_DOCUMENT_TEXT = `[Source: Page 1]
-**إجراء طلب إجازة سنوية**
-
-يهدف هذا الإجراء إلى توضيح الخطوات الرسمية لتقديم طلب إجازة سنوية للموظفين وضمان معالجته بكفاءة.
-
-**الخطوات:**
-
-1.  **تقديم الطلب عبر النظام:** يقوم الموظف بتسجيل الدخول إلى نظام الموارد البشرية الإلكتروني. يتوجه بعد ذلك إلى قسم "الإجازات" ويختار "طلب إجازة جديد". يجب على الموظف تعبئة جميع الحقول المطلوبة بدقة، بما في ذلك تحديد تاريخ بداية الإجازة ونهايتها.
-
-2.  **موافقة المدير المباشر:** بعد تقديم الطلب، يتم إرسال إشعار تلقائي إلى المدير المباشر للموظف. يقوم المدير بمراجعة الطلب، مع الأخذ في الاعتبار جدول عمل الفريق وأرصدة الإجازات المتاحة للموظف. يمكن للمدير الموافقة على الطلب، أو رفضه مع ذكر السبب، أو إعادته للموظف للتعديل.
-
-3.  **اعتماد إدارة الموارد البشرية:** في حال موافقة المدير المباشر، ينتقل الطلب تلقائيًا إلى قسم الموارد البشرية. تقوم الإدارة بالتحقق النهائي من رصيد إجازات الموظف والتأكد من عدم تعارض الإجازة مع سياسات الشركة. بعد التحقق، تقوم إدارة الموارد البشرية باعتماد الطلب بشكل نهائي.
-
-4.  **تأكيد نهائي وإشعار الموظف:** بمجرد اعتماد الطلب من قبل الموارد البشرية، يتم إرسال بريد إلكتروني تلقائي للموظف لتأكيد الموافقة على إجازته. يتم تحديث رصيد إجازات الموظف في النظام بشكل فوري.
-`;
-
 const handleClear = () => {
     userInput.value = '';
     pdfText.value = '';
@@ -266,55 +141,6 @@ const handleClear = () => {
     }
   };
   
-const handleTrySample = () => {
-      handleClear();
-      status.value = 'generating';
-      loadingMessage.value = 'جاري تحميل المثال التوضيحي...';
-
-      setTimeout(() => {
-          userInput.value = '';
-          pdfText.value = SAMPLE_DOCUMENT_TEXT;
-          documentSource.value = SAMPLE_DOCUMENT_TEXT;
-          
-          summaryData.value = {
-              summary: "يهدف هذا الإجراء إلى توضيح الخطوات الرسمية لتقديم طلب إجازة سنوية للموظفين وضمان معالجته بكفاءة، بدءًا من تقديم الطلب عبر النظام، مرورًا بموافقة المدير المباشر، ثم اعتماد الموارد البشرية، وانتهاءً بتأكيد الطلب.",
-              steps: [
-                  { stepNumber: 1, description: "تقديم الطلب عبر النظام", page: 1 },
-                  { stepNumber: 2, description: "موافقة المدير المباشر", page: 1 },
-                  { stepNumber: 3, description: "اعتماد إدارة الموارد البشرية", page: 1 },
-                  { stepNumber: 4, description: "تأكيد نهائي وإشعار الموظف", page: 1 }
-              ]
-          };
-
-          flowchartSvg.value = SAMPLE_SVG_DATA;
-
-          topQuestions.value = [
-              { question: "كيف يقدم الموظف طلب الإجازة؟", answer: "يقوم الموظف بتسجيل الدخول إلى نظام الموارد البشرية الإلكتروني والتوجه إلى قسم 'الإجازات' لتعبئة طلب جديد." },
-              { question: "من الذي يوافق على الطلب أولاً؟", answer: "المدير المباشر هو أول من يراجع الطلب ويوافق عليه." },
-              { question: "ما هو دور إدارة الموارد البشرية في هذه العملية؟", answer: "تقوم بالتحقق النهائي من رصيد إجازات الموظف ومطابقة الطلب لسياسات الشركة قبل الاعتماد النهائي." },
-              { question: "كيف يعرف الموظف أن طلبه قد تمت الموافقة عليه؟", answer: "يتم إرسال بريد إلكتروني تلقائي للموظف لتأكيد الموافقة النهائية على إجازته." }
-          ];
-          
-          qaStatus.value = 'success';
-          status.value = 'success';
-          loadingMessage.value = '';
-      }, 500);
-  };
-
-const ProxyNotConfiguredError = () => html`
-    <div class="error info" style=${{textAlign: 'right', lineHeight: '1.8'}}>
-        <h4 style=${{marginBottom: '0.5rem', fontSize: '1.2rem'}}>خطأ في الإعداد: مطلوب وكيل آمن (Proxy)</h4>
-        <p>لتأمين مفتاح API الخاص بك، تم تصميم هذا التطبيق لاستدعاء Google API عبر وسيط آمن (Cloudflare Worker).</p>
-        <p>الوسيط الخاص بك لم يتم تكوينه بعد. لتفعيل التحليل على مستنداتك الخاصة، يرجى:</p>
-        <ol style=${{marginRight: '1.5rem', marginTop: '1rem', marginBottom: '1rem', paddingRight: '0', listStyleType: 'decimal'}}>
-            <li style=${{marginBottom: '0.5rem'}}>فتح ملف <strong>index.js</strong> في محرر الكود.</li>
-            <li style=${{marginBottom: '0.5rem'}}>البحث عن المتغير <strong>CLOUDFLARE_WORKER_URL</strong>.</li>
-            <li>استبدال العنوان النائب <code>https://your-worker-name...</code> بعنوان URL الفعلي للعامل (Worker) الخاص بك.</li>
-        </ol>
-        <p>في هذه الأثناء، يمكنك الاستمرار في استكشاف التطبيق باستخدام <button class="clear-btn" style=${{padding: '2px 8px', fontSize: '0.9rem', verticalAlign: 'middle', border: '1px solid currentColor', cursor: 'pointer'}} onClick=${handleTrySample}>المثال التوضيحي</button>.</p>
-    </div>
-`;
-
 // Main App Component
 const App = () => {
 
@@ -403,15 +229,15 @@ const App = () => {
             const imagePart = await fileToGenerativePart(file);
             const prompt = "استخرج كل النصوص الموجودة في هذه الصورة باللغة العربية. حافظ على التنسيق والفقرات قدر الإمكان.";
             
-            const response = await callSecureApi(
-                'gemini-2.5-flash-preview-04-17',
-                [imagePart, {text: prompt}],
-                { thinkingBudget: 0 }
-            );
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-04-17',
+                contents: { parts: [imagePart, {text: prompt}] },
+                config: { thinkingConfig: { thinkingBudget: 0 } }
+            });
+
             return response.text;
         } catch (e) {
             console.error("Image text extraction failed:", e);
-            if (e instanceof Error && e.message.includes('Cloudflare Worker URL is not configured')) throw e;
             throw new Error('فشل في استخراج النص من الصورة.');
         }
     };
@@ -435,17 +261,16 @@ ${documentText}
 ---
 قم بإنشاء مصفوفة JSON فقط. إذا لم يتم العثور على جدول محتويات، قم بإرجاع مصفوفة فارغة \`[]\`.`;
     try {
-        const response = await callSecureApi(
-            'gemini-2.5-flash-preview-04-17',
-            prompt,
-            { responseMimeType: "application/json", thinkingBudget: 0 }
-        );
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-04-17',
+            contents: prompt,
+            config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
+        });
         
         const jsonText = extractJsonFromText(response.text);
         const toc = JSON.parse(jsonText);
         return (Array.isArray(toc) && toc.length > 0) ? toc : null;
     } catch (e) {
-        if (e instanceof Error && e.message.includes('Cloudflare Worker URL is not configured')) throw e;
         console.warn("Could not extract Table of Contents:", e);
         return null;
     }
@@ -472,11 +297,11 @@ ${documentContext}
 ---
 الآن، قم بإنشاء مصفوفة JSON فقط بناءً على القسم المحدد.`;
 
-    const response = await callSecureApi(
-        'gemini-2.5-flash-preview-04-17',
-        prompt,
-        { responseMimeType: "application/json", thinkingBudget: 0 }
-    );
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-preview-04-17',
+        contents: prompt,
+        config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
+    });
 
     const jsonText = extractJsonFromText(response.text);
     const qaData = JSON.parse(jsonText);
@@ -551,11 +376,11 @@ ${documentContext}
     *   كل كائن خطوة يجب أن يحتوي على:
         *   \`stepNumber\` (رقم).
         *   \`description\` (**عنوان الخطوة**): **نص موجز جدًا ومكثف** يلخص جوهر المرحلة. يجب أن يكون هذا العنوان مصممًا للعرض داخل صندوق في مخطط انسيابي.
-        *   \`page\` (رقم الصفحة المأخوذ من علامة \`[Source: Page X]\` في النص المصدر).
+        *   \`page\` (رقم الصفحة المأخوذ من علامة \`\\[Source: Page X\\]\` في النص المصدر).
 
 **قواعد حاسمة لا يمكن تجاوزها:**
 1.  **اللغة العربية حصرًا**: كل النصوص المولدة يجب أن تكون باللغة العربية.
-2.  **استخلاص رقم الصفحة**: لكل خطوة، حدد رقم الصفحة بدقة من أقرب علامة \`[Source: Page X]\`.
+2.  **استخلاص رقم الصفحة**: لكل خطوة، حدد رقم الصفحة بدقة من أقرب علامة \`\\[Source: Page X\\]\`.
 3.  **تنسيق JSON نقي**: المخرج النهائي يجب أن يكون كائن JSON صالح تمامًا كما هو موضح في الهيكل أعلاه. لا تضف أي تعليقات، مقدمات، خواتيم، أو علامات markdown مثل \`\`\`json. فقط كائن JSON.
 
 ---
@@ -572,7 +397,7 @@ ${documentContext}
 **تعليمات التصميم والجودة (قواعد صارمة):**
 1.  **التفاعل (Interaction)**:
     *   يجب أن تكون كل مجموعة عقدة (node group) قابلة للنقر. قم بتغليف كل عقدة (المستطيل والنص والاستشهاد) في عنصر \`<g>\`.
-    *   **أضف السمة \`id="node-\${step.stepNumber}"\`** إلى كل عنصر \`<g>\`. استخدم رقم الخطوة من بيانات JSON.
+    *   **أضف السمة \`id="node-\\\${step.stepNumber}"\`** إلى كل عنصر \`<g>\`. استخدم رقم الخطوة من بيانات JSON.
     *   **أضف السمة \`class="clickable-node"\`** إلى كل عنصر \`<g>\`.
 2.  **النمط الجمالي المحدّث (Aesthetics)**:
     *   **الألوان**: اللون الأساسي هو \`#28a745\`.
@@ -594,7 +419,7 @@ ${documentContext}
     *   **التخطيط**: قم بتوسيط جميع العقد أفقيًا. حافظ على مسافة رأسية ثابتة (مثل 60-70 بكسل) بين العقد.
     *   **لوحة الرسم (SVG Canvas)**: اضبط أبعاد \`<svg>\` بدقة لتناسب المحتوى بالكامل.
 5.  **الاستشهادات (Citations)**:
-    *   أسفل كل عقدة، ضع عنصر \`<text>\` مع \`(المصدر: صفحة \${page})\` بلون رمادي فاتح (\`#6c757d\`) وحجم خط صغير (\`12px\`).
+    *   أسفل كل عقدة، ضع عنصر \`<text>\` مع \`(المصدر: صفحة \\${page})\` بلون رمادي فاتح (\`#6c757d\`) وحجم خط صغير (\`12px\`).
 
 ---
 **بيانات الخطة (JSON مع محتوى عربي):**
@@ -604,11 +429,11 @@ ${planStepsJson}
     
     try {
       loadingMessage.value = 'المرحلة الأولى: تحليل المستند...';
-      const analysisResponse = await callSecureApi(
-        'gemini-2.5-flash-preview-04-17',
-        promptForAnalysis,
-        { responseMimeType: "application/json", thinkingBudget: 0 }
-      );
+      const analysisResponse = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-preview-04-17',
+        contents: promptForAnalysis,
+        config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
+      });
       
       const planJsonText = extractJsonFromText(analysisResponse.text);
       const plan = JSON.parse(planJsonText);
@@ -620,11 +445,11 @@ ${planStepsJson}
 
       if (plan.steps.length > 0) {
         loadingMessage.value = 'المرحلة الثانية: رسم المخطط الانسيابي...';
-        const svgResponse = await callSecureApi(
-            'gemini-2.5-flash-preview-04-17',
-            promptForSvgGeneration(JSON.stringify(plan.steps, null, 2)),
-            { thinkingBudget: 0 }
-        );
+        const svgResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-04-17',
+            contents: promptForSvgGeneration(JSON.stringify(plan.steps, null, 2)),
+            config: { thinkingConfig: { thinkingBudget: 0 } }
+        });
 
         let svgContent = svgResponse.text.trim();
         const svgMatch = svgContent.match(/<svg[\s\S]*?<\/svg>/);
@@ -642,13 +467,10 @@ ${planStepsJson}
       topQuestions.value = qaData;
       qaStatus.value = 'success';
 
-      status.value = 'success';
     } catch(err) {
       console.error('Generation error:', err);
       qaStatus.value = 'error';
-      if (err instanceof Error && err.message.includes('Cloudflare Worker URL is not configured')) {
-          errorMessage.value = html`<${ProxyNotConfiguredError} />`;
-      } else if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+      if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
         errorMessage.value = html`<div class="error">عذرًا، الخدمة تواجه ضغطًا. يرجى المحاولة مرة أخرى لاحقًا.</div>`;
       } else {
         const errorMsg = err instanceof Error ? `فشل التحليل: ${err.message}` : 'حدث خطأ غير متوقع.';
@@ -693,12 +515,8 @@ ${planStepsJson}
         handleGenerate();
     } catch (err) {
         console.error('File processing error:', err);
-        if (err instanceof Error && err.message.includes('Cloudflare Worker URL is not configured')) {
-            errorMessage.value = html`<${ProxyNotConfiguredError} />`;
-        } else {
-            const errorMsg = err instanceof Error ? err.message : 'فشل في معالجة الملف.';
-            errorMessage.value = html`<div class="error">${errorMsg}</div>`;
-        }
+        const errorMsg = err instanceof Error ? err.message : 'فشل في معالجة الملف.';
+        errorMessage.value = html`<div class="error">${errorMsg}</div>`;
         status.value = 'error';
         pdfFileName.value = '';
     } finally {
@@ -745,11 +563,11 @@ ${planStepsJson}
     const chatPrompt = `${systemInstruction}\n\n---### **المستند المصدر**---\n${documentSource.value}\n\n---### **سجل الدردشة**---\n${newHistory.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
     try {
-        const response = await callSecureApi(
-            'gemini-2.5-flash-preview-04-17',
-            chatPrompt,
-            { thinkingBudget: 0 }
-        );
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-04-17',
+            contents: chatPrompt,
+            config: { thinkingConfig: { thinkingBudget: 0 } }
+        });
 
         const currentHistory = chatHistory.value;
         const lastMessage = currentHistory[currentHistory.length - 1];
@@ -762,11 +580,7 @@ ${planStepsJson}
         const currentHistory = chatHistory.value;
         const lastMessage = currentHistory[currentHistory.length - 1];
         if (lastMessage && lastMessage.role === 'model') {
-            if (e instanceof Error && e.message.includes('Cloudflare Worker URL is not configured')) {
-                lastMessage.content = "<strong>خطأ في الإعداد:</strong> لا يمكن الاتصال بالخادم. يرجى التأكد من تكوين عنوان Cloudflare Worker في <code>index.js</code>.";
-            } else {
-                lastMessage.content = "عذرًا، حدث خطأ أثناء محاولة الرد.";
-            }
+            lastMessage.content = "عذرًا، حدث خطأ أثناء محاولة الرد.";
             chatHistory.value = [...currentHistory];
         }
     } finally {
@@ -875,7 +689,6 @@ ${planStepsJson}
             handleClearResults=${handleClearResults}
             handleFileChange=${handleFileChange}
             handleTocClick=${handleTocClick}
-            handleTrySample=${handleTrySample}
             onChartNodeClick=${startChatWithNode}
             handleMicClick=${handleMicClick}
           />`}
@@ -893,12 +706,11 @@ ${planStepsJson}
 // --- Child Components ---
 
 const ThemeToggleButton = () => {
-    const isDark = theme.value === 'dark';
-
     const toggleTheme = () => {
-        theme.value = isDark ? 'light' : 'dark';
+        theme.value = theme.value === 'dark' ? 'light' : 'dark';
     };
 
+    const isDark = theme.value === 'dark';
     const icon = isDark ? 
         html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>` : 
         html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
@@ -908,9 +720,9 @@ const ThemeToggleButton = () => {
             ${icon}
         </button>
     `;
-}
+};
 
-const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, handleTocClick, onChartNodeClick, handleTrySample, handleMicClick }) => {
+const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, handleTocClick, onChartNodeClick, handleMicClick }) => {
   const isGenerating = ['parsing', 'generating'].includes(status.value);
   const isButtonDisabled = isGenerating || (!userInput.value.trim() && !pdfText.value.trim()) || isListening.value;
   const isClearDisabled = isGenerating || (!userInput.value.trim() && !flowchartSvg.value.trim() && !summaryData.value && !errorMessage.value) || isListening.value;
@@ -974,8 +786,8 @@ const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, 
       default:
          return html`
             <div class="disabled-view">
-                <h3>مرحبًا بك!</h3>
-                <p>أنت الآن تتصفح مثالاً توضيحيًا تفاعليًا. لتحليل مستنداتك الخاصة، استبدل المحتوى الحالي بالنص أو الملف الذي تريده ثم انقر "إنشاء".</p>
+                <h3>النتائج ستظهر هنا</h3>
+                <p>أدخل نصًا أو حمّل ملفًا ثم انقر على "إنشاء المخطط الانسيابي" لبدء التحليل.</p>
             </div>
         `;
     }
@@ -1024,7 +836,6 @@ const GenerationView = ({ handleGenerate, handleClearResults, handleFileChange, 
           <button onClick=${handleMicClick} class=${`mic-btn ${isListening.value ? 'listening' : ''}`} disabled=${isMicDisabled} title="استخدم الإدخال الصوتي">
             ${micIcon}
           </button>
-          <button onClick=${handleTrySample} class="clear-btn" disabled=${isGenerating || isListening.value}>جرّب مثالاً</button>
           ${pdfFileName.value && html`<span class="file-name">ملف: ${pdfFileName.value}</span>`}
       </div>
     </div>
@@ -1178,11 +989,11 @@ ${documentSource.value}
 Generate ONLY the JSON array.`;
 
         try {
-            const response = await callSecureApi(
-                'gemini-2.5-flash-preview-04-17',
-                prompt,
-                { responseMimeType: "application/json", thinkingBudget: 0 }
-            );
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-04-17',
+                contents: prompt,
+                config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
+            });
 
             const jsonText = extractJsonFromText(response.text);
             const questions = JSON.parse(jsonText);
@@ -1253,15 +1064,11 @@ Generate ONLY the JSON array.`;
     }
     
     if (quizStatus.value === 'error') {
-        const isProxyError = quizError.value instanceof Error && quizError.value.message.includes('Cloudflare Worker URL is not configured');
         const errorMessageText = (quizError.value instanceof Error ? quizError.value.message : String(quizError.value)) || "عذرًا، فشل إنشاء الاختبار. يرجى المحاولة مرة أخرى.";
 
         return html`
             <div class="quiz-view">
-                 ${isProxyError
-                    ? html`<${ProxyNotConfiguredError} />`
-                    : html`<div class="error">${errorMessageText}</div>`
-                 }
+                 <div class="error">${errorMessageText}</div>
                 <button onClick=${handleResetQuiz} style=${{marginTop: '1rem'}}>حاول مجددًا</button>
             </div>
         `;
@@ -1371,11 +1178,12 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
 الآن، قم بإنشاء مصفوفة JSON فقط تحتوي على اقتراحات التحسين باللغة العربية.`;
         
         try {
-            const response = await callSecureApi(
-                'gemini-2.5-flash-preview-04-17',
-                prompt,
-                { responseMimeType: "application/json", thinkingBudget: 0 }
-            );
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-04-17',
+                contents: prompt,
+                config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
+            });
+
             const jsonText = extractJsonFromText(response.text);
             const suggestions = JSON.parse(jsonText);
             
@@ -1413,14 +1221,10 @@ ${JSON.stringify(summaryData.value?.steps, null, 2)}
     }
 
     if (optimizationStatus.value === 'error') {
-        const isProxyError = optimizationError.value instanceof Error && optimizationError.value.message.includes('Cloudflare Worker URL is not configured');
         const errorMessageText = (optimizationError.value instanceof Error ? optimizationError.value.message : String(optimizationError.value)) || "عذرًا، فشل في إنشاء اقتراحات التحسين.";
         return html`
             <div class="optimization-view">
-                ${isProxyError
-                    ? html`<${ProxyNotConfiguredError} />`
-                    : html`<div class="error">${errorMessageText}</div>`
-                }
+                <div class="error">${errorMessageText}</div>
                 <button onClick=${handleGenerateOptimizations} style=${{marginTop: '1rem'}}>حاول مجددًا</button>
             </div>
         `;
@@ -1501,10 +1305,6 @@ const loadStateFromLocalStorage = () => {
 
 const initializeApp = () => {
     loadStateFromLocalStorage();
-
-    if (!documentSource.value) {
-        handleTrySample();
-    }
 
     effect(() => {
         document.body.className = theme.value === 'dark' ? 'dark-theme' : '';
