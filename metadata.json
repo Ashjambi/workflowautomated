@@ -1,8 +1,8 @@
 {
-  "name": "Copy of Test1",
-  "description": "أداة ذكية لتحليل المستندات، واستخلاص الإجراءات، وتصميمها في مخططات انسيابية دقيقة لدعم اتخاذ القرار وتوضيح سير العمل.",
   "requestFramePermissions": [
     "microphone"
   ],
+  "name": "Generated",
+  "description": "",
   "prompt": ""
 }
